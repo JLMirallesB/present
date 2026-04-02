@@ -13,7 +13,6 @@
 		A10000010000000000000004 /* PresentationWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000004 /* PresentationWindow.swift */; };
 		A10000010000000000000005 /* Slide.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000005 /* Slide.swift */; };
 		A10000010000000000000006 /* RemoteServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000007 /* RemoteServer.swift */; };
-		A10000010000000000000007 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000008 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -24,7 +23,6 @@
 		A20000010000000000000005 /* Slide.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Slide.swift; sourceTree = "<group>"; };
 		A20000010000000000000006 /* Present.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Present.entitlements; sourceTree = "<group>"; };
 		A20000010000000000000007 /* RemoteServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteServer.swift; sourceTree = "<group>"; };
-		A20000010000000000000008 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A30000010000000000000001 /* Present.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Present.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -37,17 +35,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
-
-/* Begin PBXResourcesBuildPhase section */
-		A40000010000000000000002 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				A10000010000000000000007 /* Assets.xcassets in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXGroup section */
 		A50000010000000000000001 = {
@@ -68,7 +55,6 @@
 				A20000010000000000000005 /* Slide.swift */,
 				A20000010000000000000007 /* RemoteServer.swift */,
 				A20000010000000000000006 /* Present.entitlements */,
-				A20000010000000000000008 /* Assets.xcassets */,
 			);
 			path = Present;
 			sourceTree = "<group>";
@@ -90,7 +76,6 @@
 			buildPhases = (
 				A70000010000000000000001 /* Sources */,
 				A40000010000000000000001 /* Frameworks */,
-				A40000010000000000000002 /* Resources */,
 			);
 			buildRules = (
 			);

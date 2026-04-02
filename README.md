@@ -1,12 +1,19 @@
 # Present
 
+<div align="center">
+  <img src="icon_present.png" alt="Present App Icon" width="128" height="128">
+</div>
+
 A macOS SwiftUI app for giving presentations where each slide is a URL displayed in a WebView.
 
-> [!WARNING]  
-> This app was vibe coded as a demo for a conference (where I presented a talk using this app). Here's [part of the transcript](https://gisthost.github.io/?bfbc338977ceb71e298e4d4d5ac7d63c). I do not know Swift or SwiftUI. I make no promises other than it worked on my machine!
+**🔧 Enhanced Fork** - This is an improved version of the original [Present](https://github.com/simonw/present) with additional features for better presentation management.
+
+> [!NOTE]
+> Original app was vibe coded as a demo for a conference. This fork adds professional presentation management features including display names for slides, multiple presentation lists, and improved keyboard navigation.
 
 ## Features
 
+### Original Features
 - **Edit mode**: Split view with a sidebar for managing URLs and a WebView preview panel
 - **Play mode**: Fullscreen WebView with arrow key navigation (wraps around)
 - **Auto-persist**: URL list saves automatically and restores on relaunch
@@ -15,6 +22,14 @@ A macOS SwiftUI app for giving presentations where each slide is a URL displayed
 - **Drag to reorder**: Drag slides by their number to rearrange
 - **Image slides**: URLs ending in `.png`, `.gif`, `.jpg`, `.jpeg`, `.webp`, or `.svg` render as full-window images
 - **Remote control**: Embedded HTTP server on port 9123 serves a mobile-friendly page with next/prev, play/stop, zoom, and scroll controls
+
+### Enhanced Features (This Fork)
+- **Display Names**: Add custom names to each slide (different from the URL) for better organization
+- **Multiple Presentation Lists**: Save and manage multiple lists of presentations within the app
+- **Safe Editing**: Modal dialog for editing slides instead of inline editing to prevent accidental changes
+- **Improved Navigation**: Use Cmd+↑/Cmd+↓ to navigate between slides in presentation mode without interfering with web page interactions
+- **Persistent Lists**: Automatically saves the last presentation list used, so it reopens where you left off
+- **Better Organization**: Easily switch between presentation lists with a dropdown selector in the sidebar
 
 ## Screenshots
 
@@ -65,11 +80,21 @@ Note: the app is not signed or notarized, so users will need to right-click > Op
 
 ## Usage
 
+### Basic Usage
 1. Build and launch using the command above, or open `Present.xcodeproj` in Xcode and build/run (Cmd+R)
 2. Add URLs in the sidebar, preview them in the right panel
 3. **Presentation > Play** (Cmd+Shift+P) enters fullscreen
 4. Left/Right arrow keys navigate between slides
 5. Escape exits presentation mode
+
+### Enhanced Features Usage
+1. **Create Multiple Lists**: Click the "+" button to create new presentation lists
+2. **Add Display Names**: Click the pencil icon next to each slide to edit its display name and URL
+3. **Switch Lists**: Use the dropdown selector at the top of the sidebar to switch between presentations
+4. **Navigation**: In presentation mode:
+   - Left/Right arrows navigate normally
+   - Cmd+↑/Cmd+↓ navigate without interfering with web content
+5. **Manage Lists**: Use the "⋯" menu to rename or delete presentation lists
 
 ## File format
 

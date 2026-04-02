@@ -77,6 +77,12 @@ class PresentationWindowController {
             case 124: // Right arrow
                 state.goToNext()
                 return nil
+            case 126 where cmd: // Cmd+Up arrow
+                state.goToPrevious()
+                return nil
+            case 125 where cmd: // Cmd+Down arrow
+                state.goToNext()
+                return nil
             case 53: // Escape
                 self?.close(state: state)
                 return nil
