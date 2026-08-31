@@ -1,4 +1,18 @@
+# Build products
 build/
+DerivedData/
+*.dmg
+*.zip
+
+# App construida en local para poder hacer doble clic desde el repo.
+# Se regenera con ./scripts/build-app.sh — nunca se versiona.
+/Present.app/
+
+# Xcode: estado por usuario, no del proyecto
+xcuserdata/
+*.xcuserstate
+*.backup
+
 .DS_Store
 
 # Claude Code — estado local de esta máquina, no del proyecto

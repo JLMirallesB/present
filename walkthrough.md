@@ -1,3 +1,15 @@
+> [!WARNING]
+> **Este documento describe el repositorio original ([simonw/present](https://github.com/simonw/present)), no este fork.**
+>
+> Se generó con Showboat sobre el código de upstream y no se ha actualizado. En
+> particular, describe un modelo de datos plano (una única lista `slides`
+> persistida en `UserDefaults` bajo `presentAutosavedURLs`) que este fork ya no
+> usa: aquí hay varias listas (`PresentationSet`), nombres visibles por slide
+> (`displayName`) y la persistencia vive en un JSON dentro de Application Support.
+>
+> Sigue siendo útil para entender la arquitectura general —`WebView`,
+> `PresentationWindowController`, `RemoteServer`—, que apenas ha cambiado.
+
 # Present: A Code Walkthrough
 
 *2026-02-25T00:20:54Z by Showboat 0.6.1*

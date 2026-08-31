@@ -46,6 +46,19 @@ A macOS SwiftUI app for giving presentations where each slide is a URL displayed
   </tr>
 </table>
 
+## Ready-to-click app
+
+The repository keeps a built copy of the app at `Present.app` in the root, so you
+can just double-click it from the Finder. It is **not** committed (see
+`.gitignore`) — it is a local build artefact.
+
+Rebuild it after pulling or changing code:
+
+```bash
+./scripts/build-app.sh          # rebuilds ./Present.app
+./scripts/build-app.sh --open   # rebuilds and launches it
+```
+
 ## Building from the command line
 
 Build and run without opening Xcode:
@@ -98,7 +111,7 @@ Note: the app is not signed or notarized, so users will need to right-click > Op
 
 ## File format
 
-Presentation files are plain text with one URL per line:
+File > Open and File > Save As use upstream's plain text format, one URL per line:
 
 ```
 https://example.com
@@ -106,9 +119,17 @@ https://github.com
 https://simonwillison.net
 ```
 
+> [!WARNING]
+> This format carries URLs only. **Display names are lost when you save to a
+> `.txt` file** and cannot be restored by opening it again. Your lists inside the
+> app keep their display names — they live in
+> `~/Library/Containers/com.present.app/Data/Library/Application Support/Present/presentations.json`.
+
 ## Code walkthrough
 
-See [walkthrough.md](walkthrough.md) for a detailed walkthrough of the codebase.
+See [walkthrough.md](walkthrough.md) for a detailed walkthrough. Note that it was
+generated against the **original upstream code** and has not been updated for this
+fork's data model (multiple lists, display names, JSON persistence).
 
 ## License
 
