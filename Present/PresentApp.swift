@@ -38,10 +38,17 @@ struct PresentApp: App {
                 }
                 .keyboardShortcut("o", modifiers: .command)
 
-                Button("Save As...") {
+                Button("Save") {
                     FileDialogHelper.save(state: state)
                 }
                 .keyboardShortcut("s", modifiers: .command)
+                .disabled(state.slides.isEmpty)
+
+                Button("Save As...") {
+                    FileDialogHelper.saveAs(state: state)
+                }
+                .keyboardShortcut("s", modifiers: [.command, .shift])
+                .disabled(state.slides.isEmpty)
             }
 
             CommandMenu("View") {
@@ -76,20 +83,50 @@ enum FileDialogHelper {
     @MainActor
     static func open(state: PresentationState) {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.plainText]
+        panel.allowedContentTypes = [.json, .plainText]
         panel.allowsMultipleSelection = false
-        if panel.runModal() == .OK, let url = panel.url {
-            _ = state.loadFromFile(url)
+        panel.message = "Open a presentation list"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        if !state.loadFromFile(url) {
+            presentError("Could not open \(url.lastPathComponent)",
+                         detail: "The file is empty, or not a presentation list.")
+        }
+    }
+
+    /// Writes straight back to the file the list came from. With no such file
+    /// yet — a list built in the app — it falls through to Save As.
+    @MainActor
+    static func save(state: PresentationState) {
+        guard let url = state.currentFileURL else {
+            saveAs(state: state)
+            return
+        }
+        if !state.saveToFile(url) {
+            presentError("Could not save \(url.lastPathComponent)",
+                         detail: "The file could not be written. Try Save As.")
         }
     }
 
     @MainActor
-    static func save(state: PresentationState) {
+    static func saveAs(state: PresentationState) {
         let panel = NSSavePanel()
-        panel.allowedContentTypes = [.plainText]
-        panel.nameFieldStringValue = "presentation.txt"
-        if panel.runModal() == .OK, let url = panel.url {
-            _ = state.saveToFile(url)
+        // JSON first: it is the lossless one, so it is the default.
+        panel.allowedContentTypes = [.json, .plainText]
+        panel.nameFieldStringValue = (state.currentSet?.name ?? "presentation") + ".json"
+        panel.message = "JSON keeps display names. Plain text is interchangeable with other forks of Present."
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        if !state.saveToFile(url) {
+            presentError("Could not save \(url.lastPathComponent)",
+                         detail: "The file could not be written.")
         }
+    }
+
+    @MainActor
+    private static func presentError(_ message: String, detail: String) {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = message
+        alert.informativeText = detail
+        alert.runModal()
     }
 }

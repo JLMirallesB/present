@@ -148,21 +148,44 @@ Note: the app is not signed or notarized, so users will need to right-click > Op
 
 ## File format
 
-File > Open and File > Save As use upstream's plain text format, one URL per line:
+**File > Save** (Cmd+S) writes back to the file the list came from. **File >
+Save As** (Cmd+Shift+S) picks a new one. Both formats are lossless — display
+names, text slides and the list name all survive a round trip.
+
+`.json` is the native format:
+
+```json
+{
+  "name": "Congreso 2026",
+  "slides": [
+    { "id": "…", "url": "https://jlmirall.es", "displayName": "Portada" },
+    { "id": "…", "url": "", "displayName": "Sección", "text": "# El pulpo" }
+  ]
+}
+```
+
+`.txt` is one slide per line, and stays interchangeable with upstream and with
+[kcarnold's fork](https://github.com/kcarnold/present):
 
 ```
 https://example.com
-https://github.com
-https://simonwillison.net
+Portada | https://jlmirall.es
+Sección | "# El pulpo\n\n- uno\n- **dos**"
 ```
 
-Text slides are written as a quoted line, `"# Title\n\nSubtitle"`.
+A bare line is a URL. A `Name | ` prefix adds a display name, and a quoted body
+is a text slide with `\n` for line breaks. `\` and `|` are backslash-escaped in
+every field, so a pipe inside a URL or a slide is never mistaken for the
+separator. Plain URL-per-line files from upstream open unchanged.
 
-> [!WARNING]
-> This format carries URLs and text slides, but not display names. **Display
-> names are lost when you save to a `.txt` file.** Your lists inside the app
-> keep them — they live in
-> `~/Library/Containers/com.present.app/Data/Library/Application Support/Present/presentations.json`.
+Opening a file detects the format from its contents, not its extension. The
+window title shows the list name, with "— Edited" once it has drifted from the
+file on disk.
+
+> [!NOTE]
+> The file association lasts for the session. Under the sandbox, permission to
+> write a file you picked does not outlive the launch that granted it, so after
+> relaunching, Save asks again where to put it.
 
 ## Code walkthrough
 

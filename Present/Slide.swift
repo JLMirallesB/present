@@ -118,6 +118,15 @@ class PresentationState {
     var isPresenting: Bool = false
     var zoomLevel: Double = 1.0
 
+    /// The file the current list came from, or was last written to. Session
+    /// only: under the sandbox, access to a user-picked file does not outlive
+    /// the launch that granted it, so remembering the path would just produce
+    /// a Save that fails.
+    private(set) var currentFileURL: URL?
+    /// Whether the current list has changed since it was last written to that
+    /// file. Meaningless without one, so it stays false until there is one.
+    private(set) var hasUnsavedFileChanges = false
+
     func zoomIn() { zoomLevel = min(zoomLevel + 0.1, 5.0) }
     func zoomOut() { zoomLevel = max(zoomLevel - 0.1, 0.3) }
     func zoomReset() { zoomLevel = 1.0 }
@@ -162,6 +171,7 @@ class PresentationState {
         if currentSetId == nil || presentationSets.first(where: { $0.id == currentSetId }) == nil {
             currentSetId = presentationSets.first?.id
         }
+        hasUnsavedFileChanges = false
     }
 
     var currentSet: PresentationSet? {
@@ -193,6 +203,7 @@ class PresentationState {
         presentationSets.append(newSet)
         currentSetId = newSet.id
         currentIndex = 0
+        detachFromFile()
     }
 
     func deleteSet(id: UUID) {
@@ -201,6 +212,7 @@ class PresentationState {
         if currentSetId == id {
             currentSetId = presentationSets.first?.id
             currentIndex = 0
+            detachFromFile()
         }
     }
 
@@ -211,10 +223,17 @@ class PresentationState {
     }
 
     func switchToSet(id: UUID) {
-        if presentationSets.first(where: { $0.id == id }) != nil {
+        if presentationSets.first(where: { $0.id == id }) != nil, id != currentSetId {
             currentSetId = id
             currentIndex = 0
+            detachFromFile()
         }
+    }
+
+    /// The file belongs to the list it was opened as, not to the app.
+    private func detachFromFile() {
+        currentFileURL = nil
+        hasUnsavedFileChanges = false
     }
 
     func addSlide(_ slide: Slide) {
@@ -257,6 +276,7 @@ class PresentationState {
 
     func saveToDisk() {
         guard !isLoading else { return }
+        if currentFileURL != nil { hasUnsavedFileChanges = true }
         let document = StoredDocument(sets: presentationSets, currentSetId: currentSetId)
         let url = storeURL
         do {
@@ -318,34 +338,104 @@ class PresentationState {
         return false
     }
 
-    // MARK: - Plain text file format
+    // MARK: - File formats
     //
-    // One slide per line. A line wrapped in double quotes is a text slide, with
-    // \n for line breaks — the convention used by kcarnold's fork, so files
-    // stay interchangeable. Everything else is a URL.
+    // Two of them, both lossless:
+    //
+    //   .json  the native format. Carries display names, text slides and the
+    //          list name. What Save writes unless you ask for otherwise.
+    //
+    //   .txt   one slide per line, kept compatible with upstream and with
+    //          kcarnold's fork. A quoted line is a text slide; an optional
+    //          "Name | " prefix carries the display name. `\` and `|` are
+    //          backslash-escaped in every field, so neither can be mistaken
+    //          for the separator.
+
+    enum FileFormat {
+        case json
+        case plainText
+
+        static func inferred(from url: URL) -> FileFormat {
+            url.pathExtension.lowercased() == "json" ? .json : .plainText
+        }
+    }
+
+    /// One presentation list, as written to a .json file.
+    struct PresentationFile: Codable {
+        var name: String
+        var slides: [Slide]
+    }
 
     static func parseLine(_ line: String) -> Slide? {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return nil }
-        if trimmed.count >= 2, trimmed.hasPrefix("\""), trimmed.hasSuffix("\"") {
-            let body = String(trimmed.dropFirst().dropLast())
-            return Slide.textSlide(unescapeTextLine(body))
+
+        var displayName: String?
+        var body = trimmed
+        if let separator = indexOfUnescapedPipe(in: trimmed) {
+            let name = unescapeField(String(trimmed[trimmed.startIndex..<separator]))
+                .trimmingCharacters(in: .whitespaces)
+            displayName = name.isEmpty ? nil : name
+            body = String(trimmed[trimmed.index(after: separator)...])
+                .trimmingCharacters(in: .whitespaces)
         }
-        return Slide(url: trimmed)
+        guard !body.isEmpty else { return nil }
+
+        if body.count >= 2, body.hasPrefix("\""), body.hasSuffix("\"") {
+            let text = unescapeField(String(body.dropFirst().dropLast()))
+            return Slide.textSlide(text, displayName: displayName)
+        }
+        return Slide(url: unescapeField(body), displayName: displayName)
     }
 
     static func formatLine(_ slide: Slide) -> String {
-        guard let text = slide.text else { return slide.url }
-        return "\"\(escapeTextLine(text))\""
+        let body: String
+        if let text = slide.text {
+            body = "\"\(escapeField(text, alsoEscaping: "\"\n"))\""
+        } else {
+            body = escapeField(slide.url)
+        }
+
+        guard let name = slide.displayName,
+              !name.trimmingCharacters(in: .whitespaces).isEmpty else { return body }
+        return "\(escapeField(name)) | \(body)"
     }
 
-    private static func escapeTextLine(_ text: String) -> String {
-        text.replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-            .replacingOccurrences(of: "\n", with: "\\n")
+    /// The first `|` that is not preceded by a backslash, if any.
+    private static func indexOfUnescapedPipe(in text: String) -> String.Index? {
+        var escaped = false
+        var index = text.startIndex
+        while index < text.endIndex {
+            let character = text[index]
+            if escaped {
+                escaped = false
+            } else if character == "\\" {
+                escaped = true
+            } else if character == "|" {
+                return index
+            }
+            index = text.index(after: index)
+        }
+        return nil
     }
 
-    private static func unescapeTextLine(_ raw: String) -> String {
+    /// Always escapes `\` and `|`; text bodies also escape quotes and newlines.
+    private static func escapeField(_ text: String, alsoEscaping extras: String = "") -> String {
+        var out = ""
+        for character in text {
+            switch character {
+            case "\\": out += "\\\\"
+            case "|": out += "\\|"
+            case "\"" where extras.contains("\""): out += "\\\""
+            case "\n" where extras.contains("\n"): out += "\\n"
+            case "\t" where extras.contains("\n"): out += "\\t"
+            default: out.append(character)
+            }
+        }
+        return out
+    }
+
+    private static func unescapeField(_ raw: String) -> String {
         var out = ""
         var escaped = false
         for character in raw {
@@ -367,28 +457,51 @@ class PresentationState {
     }
 
     func loadFromFile(_ url: URL) -> Bool {
-        guard let contents = try? String(contentsOf: url, encoding: .utf8) else { return false }
-        let slides = contents.components(separatedBy: .newlines).compactMap(Self.parseLine)
-        guard !slides.isEmpty else { return false }
+        guard let data = try? Data(contentsOf: url) else { return false }
+        let fallbackName = url.deletingPathExtension().lastPathComponent
 
-        // Each opened file becomes a new list, named after the file.
-        let fileName = url.deletingPathExtension().lastPathComponent
-        var newSet = PresentationSet(name: fileName)
-        newSet.slides = slides
+        var newSet: PresentationSet
+        if let file = try? JSONDecoder().decode(PresentationFile.self, from: data) {
+            // Fresh ids, so opening the same file twice does not collide.
+            let slides = file.slides.map {
+                Slide(url: $0.url, displayName: $0.displayName, text: $0.text)
+            }
+            let name = file.name.trimmingCharacters(in: .whitespaces)
+            newSet = PresentationSet(name: name.isEmpty ? fallbackName : name, slides: slides)
+        } else {
+            guard let contents = String(data: data, encoding: .utf8) else { return false }
+            let slides = contents.components(separatedBy: .newlines).compactMap(Self.parseLine)
+            newSet = PresentationSet(name: fallbackName, slides: slides)
+        }
+        guard !newSet.slides.isEmpty else { return false }
 
         presentationSets.append(newSet)
         currentSetId = newSet.id
         currentIndex = 0
+        currentFileURL = url
+        hasUnsavedFileChanges = false
         return true
     }
 
-    func saveToFile(_ url: URL) -> Bool {
+    @discardableResult
+    func saveToFile(_ url: URL, format: FileFormat? = nil) -> Bool {
         guard let currentSet else { return false }
-        let contents = currentSet.slides.map(Self.formatLine).joined(separator: "\n") + "\n"
         do {
-            try contents.write(to: url, atomically: true, encoding: .utf8)
+            switch format ?? .inferred(from: url) {
+            case .json:
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+                let file = PresentationFile(name: currentSet.name, slides: currentSet.slides)
+                try encoder.encode(file).write(to: url, options: .atomic)
+            case .plainText:
+                let contents = currentSet.slides.map(Self.formatLine).joined(separator: "\n") + "\n"
+                try contents.write(to: url, atomically: true, encoding: .utf8)
+            }
+            currentFileURL = url
+            hasUnsavedFileChanges = false
             return true
         } catch {
+            print("Present: error writing \(url.lastPathComponent): \(error)")
             return false
         }
     }

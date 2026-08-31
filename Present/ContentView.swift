@@ -157,6 +157,7 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .navigationTitle(windowTitle)
         .onAppear {
             if state.slides.isEmpty {
                 addSlide()
@@ -194,6 +195,13 @@ struct ContentView: View {
             }
             Button("Cancel", role: .cancel) { }
         }
+    }
+
+    /// The list name, plus the standard "Edited" marker once the list has
+    /// drifted from the file it came from.
+    private var windowTitle: String {
+        let name = state.currentSet?.name ?? "Present"
+        return state.hasUnsavedFileChanges ? "\(name) — Edited" : name
     }
 
     private func startEditing(_ slide: Slide) {

@@ -214,3 +214,188 @@ final class PresentationStateTests: XCTestCase {
         XCTAssertEqual(PresentationState.parseLine("  https://a.test  ")?.url, "https://a.test")
     }
 }
+
+// MARK: - File formats
+
+final class FileFormatTests: XCTestCase {
+
+    private var directory: URL!
+    private var defaults: UserDefaults!
+    private var suiteName: String!
+
+    override func setUpWithError() throws {
+        directory = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("PresentFileTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        suiteName = "PresentFileTests-\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suiteName)
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: directory)
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    private func makeState() -> PresentationState {
+        PresentationState(
+            storeURL: directory.appendingPathComponent("\(UUID().uuidString).json"),
+            defaults: defaults
+        )
+    }
+
+    /// The slides used to check that nothing is dropped on the way out and back.
+    private func seed(_ state: PresentationState) {
+        state.addSlide(Slide(url: "https://jlmirall.es", displayName: "Portada"))
+        state.addSlide(Slide(url: "https://example.com/a.png"))
+        state.addSlide(Slide.textSlide("# Título\n\nCon *énfasis*", displayName: "Sección"))
+    }
+
+    private func assertRoundTrips(_ file: URL, line: UInt = #line) {
+        let source = makeState()
+        seed(source)
+        XCTAssertTrue(source.saveToFile(file), line: line)
+
+        let target = makeState()
+        XCTAssertTrue(target.loadFromFile(file), line: line)
+        XCTAssertEqual(target.slides.count, 3, line: line)
+        XCTAssertEqual(target.slides.map(\.url), source.slides.map(\.url), line: line)
+        XCTAssertEqual(target.slides.map(\.displayName), source.slides.map(\.displayName), line: line)
+        XCTAssertEqual(target.slides.map(\.text), source.slides.map(\.text), line: line)
+    }
+
+    /// The whole point of category 3: Save must not silently drop data.
+    func testJSONRoundTripKeepsEverything() {
+        assertRoundTrips(directory.appendingPathComponent("charla.json"))
+    }
+
+    func testPlainTextRoundTripKeepsEverything() {
+        assertRoundTrips(directory.appendingPathComponent("charla.txt"))
+    }
+
+    func testJSONFileCarriesTheListName() {
+        let state = makeState()
+        state.createSet(name: "Congreso")
+        state.addSlide(Slide(url: "https://a.test"))
+        let file = directory.appendingPathComponent("cualquiera.json")
+        XCTAssertTrue(state.saveToFile(file))
+
+        let reopened = makeState()
+        XCTAssertTrue(reopened.loadFromFile(file))
+        XCTAssertEqual(reopened.currentSet?.name, "Congreso")
+    }
+
+    // MARK: Escaping in the plain text format
+
+    func testPipesInNamesAndURLsSurvive() {
+        let slide = Slide(url: "https://a.test/?q=x%7Cy|z", displayName: "A | B")
+        let parsed = PresentationState.parseLine(PresentationState.formatLine(slide))
+        XCTAssertEqual(parsed?.displayName, "A | B")
+        XCTAssertEqual(parsed?.url, "https://a.test/?q=x%7Cy|z")
+    }
+
+    func testPipesInsideTextSlidesAreNotReadAsASeparator() {
+        let slide = Slide.textSlide("a | b\nc", displayName: "T")
+        let parsed = PresentationState.parseLine(PresentationState.formatLine(slide))
+        XCTAssertEqual(parsed?.displayName, "T")
+        XCTAssertEqual(parsed?.text, "a | b\nc")
+    }
+
+    func testBackslashesSurvive() {
+        let slide = Slide(url: "https://a.test/c:\\path", displayName: "back\\slash")
+        let parsed = PresentationState.parseLine(PresentationState.formatLine(slide))
+        XCTAssertEqual(parsed?.displayName, "back\\slash")
+        XCTAssertEqual(parsed?.url, "https://a.test/c:\\path")
+    }
+
+    /// Upstream files are bare URLs, one per line, and must still open.
+    func testUpstreamPlainFilesStillOpen() throws {
+        let file = directory.appendingPathComponent("upstream.txt")
+        try "https://a.test\nhttps://b.test\n".write(to: file, atomically: true, encoding: .utf8)
+
+        let state = makeState()
+        XCTAssertTrue(state.loadFromFile(file))
+        XCTAssertEqual(state.slides.map(\.url), ["https://a.test", "https://b.test"])
+        XCTAssertNil(state.slides[0].displayName)
+    }
+
+    func testFormatIsChosenByExtension() {
+        let state = makeState()
+        state.addSlide(Slide(url: "https://a.test", displayName: "A"))
+
+        let json = directory.appendingPathComponent("x.json")
+        let text = directory.appendingPathComponent("x.txt")
+        state.saveToFile(json)
+        state.saveToFile(text)
+
+        XCTAssertTrue((try? String(contentsOf: json, encoding: .utf8))?.hasPrefix("{") == true)
+        XCTAssertEqual(try? String(contentsOf: text, encoding: .utf8), "A | https://a.test\n")
+    }
+
+    func testOpeningTheSameFileTwiceDoesNotReuseSlideIDs() {
+        let state = makeState()
+        state.addSlide(Slide(url: "https://a.test"))
+        let file = directory.appendingPathComponent("x.json")
+        state.saveToFile(file)
+
+        let target = makeState()
+        XCTAssertTrue(target.loadFromFile(file))
+        let firstIDs = target.slides.map(\.id)
+        XCTAssertTrue(target.loadFromFile(file))
+        XCTAssertTrue(Set(firstIDs).isDisjoint(with: target.slides.map(\.id)))
+    }
+
+    func testOpeningRubbishFails() throws {
+        let file = directory.appendingPathComponent("empty.txt")
+        try "\n   \n".write(to: file, atomically: true, encoding: .utf8)
+        XCTAssertFalse(makeState().loadFromFile(file))
+    }
+
+    // MARK: Save vs Save As
+
+    func testSaveTracksTheFileAndClearsTheEditedMarker() {
+        let state = makeState()
+        state.addSlide(Slide(url: "https://a.test"))
+        XCTAssertNil(state.currentFileURL)
+
+        let file = directory.appendingPathComponent("x.json")
+        XCTAssertTrue(state.saveToFile(file))
+        XCTAssertEqual(state.currentFileURL, file)
+        XCTAssertFalse(state.hasUnsavedFileChanges)
+
+        state.addSlide(Slide(url: "https://b.test"))
+        XCTAssertTrue(state.hasUnsavedFileChanges)
+
+        XCTAssertTrue(state.saveToFile(file))
+        XCTAssertFalse(state.hasUnsavedFileChanges)
+    }
+
+    func testOpeningAFileAssociatesItWithoutMarkingItEdited() {
+        let source = makeState()
+        source.addSlide(Slide(url: "https://a.test"))
+        let file = directory.appendingPathComponent("x.json")
+        source.saveToFile(file)
+
+        let target = makeState()
+        XCTAssertTrue(target.loadFromFile(file))
+        XCTAssertEqual(target.currentFileURL, file)
+        XCTAssertFalse(target.hasUnsavedFileChanges)
+    }
+
+    /// The file belongs to the list, so switching lists must let go of it —
+    /// otherwise Cmd+S would overwrite it with a different presentation.
+    func testSwitchingListsReleasesTheFile() {
+        let state = makeState()
+        state.addSlide(Slide(url: "https://a.test"))
+        state.saveToFile(directory.appendingPathComponent("x.json"))
+        XCTAssertNotNil(state.currentFileURL)
+
+        state.createSet(name: "Otra")
+        XCTAssertNil(state.currentFileURL)
+    }
+
+    func testAFreshListIsNotMarkedEdited() {
+        let state = makeState()
+        state.addSlide(Slide(url: "https://a.test"))
+        XCTAssertFalse(state.hasUnsavedFileChanges, "no file to be dirty against")
+    }
+}
