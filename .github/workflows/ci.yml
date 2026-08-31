@@ -42,7 +42,7 @@ jobs:
             CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO
 
       - name: Upload Present.app
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: Present.app
           path: build/Release/Present.app
