@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test and build
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: xcodebuild -version
+
+      # Ad-hoc signing ("-"): the runner has no developer identity, and the app
+      # is not notarised anyway. Enough to produce a launchable bundle.
+      - name: Test
+        run: |
+          xcodebuild test \
+            -project Present.xcodeproj \
+            -scheme Present \
+            -destination "platform=macOS" \
+            CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO
+
+      - name: Build Release
+        run: |
+          xcodebuild build \
+            -project Present.xcodeproj \
+            -scheme Present \
+            -configuration Release \
+            -destination "generic/platform=macOS" \
+            SYMROOT=build \
+            CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO
+
+      - name: Upload Present.app
+        uses: actions/upload-artifact@v4
+        with:
+          name: Present.app
+          path: build/Release/Present.app
+          if-no-files-found: error
