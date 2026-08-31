@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @Bindable var state: PresentationState
+    var server: RemoteServer
     @State private var selection: UUID?
     @State private var editingSlide: Slide?
     @State private var editingDisplayName: String = ""
@@ -13,6 +14,7 @@ struct ContentView: View {
     @State private var showingNewSetAlert = false
     @State private var showingRenameSetAlert = false
     @State private var renameSetName: String = ""
+    @State private var showingRemoteInfo = false
 
     var body: some View {
         NavigationSplitView {
@@ -158,6 +160,16 @@ struct ContentView: View {
             }
         }
         .navigationTitle(windowTitle)
+        .onReceive(NotificationCenter.default.publisher(for: .showRemoteInfo)) { _ in
+            showingRemoteInfo = true
+        }
+        .sheet(isPresented: $showingRemoteInfo) {
+            RemoteControlView(
+                server: server,
+                onToggle: { server.toggle(state: state) },
+                onClose: { showingRemoteInfo = false }
+            )
+        }
         .onAppear {
             if state.slides.isEmpty {
                 addSlide()

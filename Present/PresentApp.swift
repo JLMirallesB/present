@@ -18,7 +18,7 @@ struct PresentApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView(state: state)
+            ContentView(state: state, server: server)
                 .onReceive(NotificationCenter.default.publisher(for: .remotePlay)) { _ in
                     if !state.isPresenting {
                         presentationController.open(state: state)
@@ -74,6 +74,26 @@ struct PresentApp: App {
                 }
                 .keyboardShortcut("p", modifiers: [.command, .shift])
                 .disabled(state.slides.isEmpty)
+
+                if PresentationWindowController.availableScreens.count > 1 {
+                    Menu("Display") {
+                        ForEach(Array(PresentationWindowController.availableScreens.enumerated()), id: \.offset) { index, screen in
+                            Button {
+                                state.preferredScreenIndex = index
+                            } label: {
+                                let current = state.preferredScreenIndex ?? PresentationWindowController.availableScreens.firstIndex(where: { $0 == NSScreen.main }) ?? 0
+                                Text("\(index + 1). \(screen.localizedName)" + (index == current ? " ✓" : ""))
+                            }
+                        }
+                    }
+                }
+
+                Divider()
+
+                Button("Remote Control...") {
+                    NotificationCenter.default.post(name: .showRemoteInfo, object: nil)
+                }
+                .keyboardShortcut("r", modifiers: [.command, .shift])
             }
         }
     }

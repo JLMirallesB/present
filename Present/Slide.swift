@@ -2,13 +2,18 @@ import Foundation
 
 /// What a slide actually renders. Kept in the model rather than in `WebView`
 /// so the decision is testable without spinning up a view.
-enum SlideContent: Equatable {
+enum SlideContent: Hashable {
     /// A web page, at an absolute URL.
     case web(String)
     /// An image, shown letterboxed on black, at an absolute URL.
     case image(String)
     /// Markdown, rendered by the app itself.
     case text(String)
+
+    var isImage: Bool {
+        if case .image = self { return true }
+        return false
+    }
 }
 
 @Observable
@@ -117,6 +122,10 @@ class PresentationState {
     var currentIndex: Int = 0
     var isPresenting: Bool = false
     var zoomLevel: Double = 1.0
+    /// Screen blanked mid-talk, so the room looks at you and not at the slide.
+    var isBlackedOut: Bool = false
+    /// Which display to present on. Session only: monitors come and go.
+    var preferredScreenIndex: Int?
 
     /// The file the current list came from, or was last written to. Session
     /// only: under the sandbox, access to a user-picked file does not outlive
@@ -186,6 +195,17 @@ class PresentationState {
     var currentSlide: Slide? {
         guard !slides.isEmpty, currentIndex >= 0, currentIndex < slides.count else { return nil }
         return slides[currentIndex]
+    }
+
+    /// The slides to have ready: the next one, and the previous one for when
+    /// you step back. Wraps around, like navigation does.
+    var neighbourContents: [SlideContent] {
+        guard slides.count > 1 else { return [] }
+        let next = (currentIndex + 1) % slides.count
+        let previous = (currentIndex - 1 + slides.count) % slides.count
+        var result = [slides[next].content]
+        if previous != next { result.append(slides[previous].content) }
+        return result
     }
 
     func goToNext() {

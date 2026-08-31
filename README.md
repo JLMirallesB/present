@@ -30,6 +30,11 @@ A macOS SwiftUI app for giving presentations where each slide is a URL displayed
 - **Improved Navigation**: Use Cmd+↑/Cmd+↓ to navigate between slides in presentation mode without interfering with web page interactions
 - **Persistent Lists**: Automatically saves the last presentation list used, so it reopens where you left off
 - **Better Organization**: Easily switch between presentation lists with a dropdown selector in the sidebar
+- **Clicker Support**: Page Up/Page Down, so a physical presentation remote works
+- **Preloading**: The next and previous slides load in the background, so moving between them is instant instead of a white flash
+- **Blackout**: Press `B` to blank the screen mid-talk
+- **Multiple Displays**: Pick which screen to present on
+- **Secured Remote**: The phone remote now needs a key, shown as a QR code in the app
 - **Text Slides**: Slides written in Markdown and rendered by the app, for titles, section breaks or a closing slide — no URL needed
 
 ## Screenshots
@@ -78,8 +83,9 @@ interchangeable.
 ./scripts/test.sh
 ```
 
-43 tests covering the model: persistence and its migrations, navigation,
-reordering, the file format and the Markdown renderer. They run in about a
+88 tests covering the model: persistence and its migrations, navigation,
+reordering, the file formats, the Markdown renderer, the presentation keymap
+and the remote server's access checks. They run in about a
 tenth of a second, with no app launch, and run on every push via
 [GitHub Actions](.github/workflows/ci.yml).
 
@@ -137,14 +143,50 @@ Note: the app is not signed or notarized, so users will need to right-click > Op
 4. Left/Right arrow keys navigate between slides
 5. Escape exits presentation mode
 
-### Enhanced Features Usage
+### Presenting
+
+**Presentation > Play** (Cmd+Shift+P) goes fullscreen. With more than one
+display connected, **Presentation > Display** picks which one.
+
+| Key | |
+|---|---|
+| → / Page Down | Next slide |
+| ← / Page Up | Previous slide |
+| Cmd+↑ / Cmd+↓ | Previous / next, for pages that use the arrows themselves |
+| Home / End | First / last slide |
+| `B` | Blank the screen, and back |
+| Cmd+= / Cmd+- / Cmd+0 | Zoom in, out, reset |
+| Esc | Un-blank, or leave the presentation |
+
+Page Up and Page Down are what presentation clickers send, so a physical remote
+works. ↑, ↓ and space are deliberately left to the page, so a slide that is a
+long article can still be scrolled.
+
+The next and previous slides are loaded in the background while you talk, so
+moving between them shows a page that is already there. A slide you come back to
+is where you left it, scroll position and all.
+
+### Remote control
+
+**Presentation > Remote Control** (Cmd+Shift+R) shows a QR code. Scan it with a
+phone on the same network for next/prev, play/stop, zoom and a scroll strip.
+
+> [!IMPORTANT]
+> The address contains a key, generated fresh each time Present starts. It is
+> what stops **any web page open in any browser on your Mac** from advancing
+> your slides with `fetch("http://localhost:9123/next")` — the response would be
+> blocked by the browser, but the slide would already have moved. Requests
+> arriving under a domain name are refused too, which is what DNS rebinding
+> would look like. Anyone you give the address to can drive the presentation, so
+> treat it as you would the clicker itself. The panel also turns the remote off
+> entirely.
+
+### Managing lists
+
 1. **Create Multiple Lists**: Click the "+" button to create new presentation lists
 2. **Add Display Names**: Click the pencil icon next to each slide to edit its display name and URL
 3. **Switch Lists**: Use the dropdown selector at the top of the sidebar to switch between presentations
-4. **Navigation**: In presentation mode:
-   - Left/Right arrows navigate normally
-   - Cmd+↑/Cmd+↓ navigate without interfering with web content
-5. **Manage Lists**: Use the "⋯" menu to rename or delete presentation lists
+4. **Manage Lists**: Use the "..." menu to rename or delete presentation lists
 
 ## File format
 

@@ -79,3 +79,47 @@ final class SlideTests: XCTestCase {
         XCTAssertEqual(decoded.displayName, original.displayName)
     }
 }
+
+/// Which slides the presentation window loads ahead of time.
+final class PreloadTests: XCTestCase {
+
+    private func makeState(slideCount: Int) -> PresentationState {
+        let state = PresentationState(
+            storeURL: URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("\(UUID()).json"),
+            defaults: UserDefaults(suiteName: "preload-\(UUID().uuidString)")!
+        )
+        for index in 0..<slideCount {
+            state.addSlide(Slide(url: "https://example.com/\(index)"))
+        }
+        return state
+    }
+
+    func testPreloadsTheNextAndPreviousSlide() {
+        let state = makeState(slideCount: 4)
+        state.currentIndex = 1
+        XCTAssertEqual(state.neighbourContents, [
+            .web("https://example.com/2"),
+            .web("https://example.com/0"),
+        ])
+    }
+
+    /// Navigation wraps, so the neighbours must wrap too — otherwise the jump
+    /// from the last slide back to the first is the one that stutters.
+    func testNeighboursWrapAround() {
+        let state = makeState(slideCount: 3)
+        state.currentIndex = 2
+        XCTAssertEqual(state.neighbourContents, [
+            .web("https://example.com/0"),
+            .web("https://example.com/1"),
+        ])
+    }
+
+    func testTwoSlidesDoNotListTheSameNeighbourTwice() {
+        let state = makeState(slideCount: 2)
+        XCTAssertEqual(state.neighbourContents, [.web("https://example.com/1")])
+    }
+
+    func testASingleSlideHasNothingToPreload() {
+        XCTAssertTrue(makeState(slideCount: 1).neighbourContents.isEmpty)
+    }
+}
