@@ -1,5 +1,12 @@
 import Foundation
 
+/// A request from the remote for the visible slide to scroll. Carries a
+/// sequence number because the same `dy` twice in a row is two scrolls, not one.
+struct ScrollRequest: Equatable {
+    var sequence: Int = 0
+    var dy: Double = 0
+}
+
 /// What a slide actually renders. Kept in the model rather than in `WebView`
 /// so the decision is testable without spinning up a view.
 enum SlideContent: Hashable {
@@ -122,6 +129,8 @@ class PresentationState {
     var currentIndex: Int = 0
     var isPresenting: Bool = false
     var zoomLevel: Double = 1.0
+    /// Set by the remote; the visible slide watches it.
+    private(set) var scrollRequest = ScrollRequest()
     /// Screen blanked mid-talk, so the room looks at you and not at the slide.
     var isBlackedOut: Bool = false
     /// Which display to present on. Session only: monitors come and go.
@@ -135,6 +144,10 @@ class PresentationState {
     /// Whether the current list has changed since it was last written to that
     /// file. Meaningless without one, so it stays false until there is one.
     private(set) var hasUnsavedFileChanges = false
+
+    func requestScroll(dy: Double) {
+        scrollRequest = ScrollRequest(sequence: scrollRequest.sequence + 1, dy: dy)
+    }
 
     func zoomIn() { zoomLevel = min(zoomLevel + 0.1, 5.0) }
     func zoomOut() { zoomLevel = max(zoomLevel - 0.1, 0.3) }

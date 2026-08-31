@@ -83,7 +83,7 @@ interchangeable.
 ./scripts/test.sh
 ```
 
-88 tests covering the model: persistence and its migrations, navigation,
+91 tests covering the model: persistence and its migrations, navigation,
 reordering, the file formats, the Markdown renderer, the presentation keymap
 and the remote server's access checks. They run in about a
 tenth of a second, with no app launch, and run on every push via

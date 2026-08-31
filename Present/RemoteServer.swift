@@ -4,7 +4,6 @@ import Network
 extension Notification.Name {
     static let remotePlay = Notification.Name("remotePlay")
     static let remoteStop = Notification.Name("remoteStop")
-    static let remoteScroll = Notification.Name("remoteScroll")
     static let showRemoteInfo = Notification.Name("showRemoteInfo")
 }
 
@@ -221,7 +220,7 @@ final class RemoteServer {
             return .ok
         case "/scroll":
             if let dy = query["dy"].flatMap(Double.init) {
-                NotificationCenter.default.post(name: .remoteScroll, object: nil, userInfo: ["dy": dy])
+                state?.requestScroll(dy: dy)
             }
             return .ok
         case "/status":
@@ -319,7 +318,7 @@ final class RemoteServer {
                               nil, 0, NI_NUMERICHOST) == 0 else { continue }
 
             let name = String(cString: pointer.pointee.ifa_name)
-            let host = String(cString: buffer)
+            let host = String(decoding: buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
             if name == "en0" { return host }   // Wi-Fi first
             if best == nil { best = host }
         }

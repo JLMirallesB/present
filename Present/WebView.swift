@@ -100,6 +100,8 @@ struct WebView: NSViewRepresentable {
     /// Slides to have loaded before they are asked for.
     var neighbours: [SlideContent] = []
     var pageZoom: Double = 1.0
+    /// Scroll asked for by the remote. Applied once per new sequence number.
+    var scroll = ScrollRequest()
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -109,7 +111,8 @@ struct WebView: NSViewRepresentable {
         let container = ContainerView()
         container.wantsLayer = true
         container.layer?.backgroundColor = NSColor.black.cgColor
-        context.coordinator.startListening()
+        // Whatever the remote asked for before this view existed is not ours.
+        context.coordinator.lastScrollSequence = scroll.sequence
         update(container, coordinator: context.coordinator)
         return container
     }
@@ -131,6 +134,11 @@ struct WebView: NSViewRepresentable {
         }
         pool.setPageZoom(pageZoom, for: content)
         pool.preload(neighbours)
+
+        if scroll.sequence != coordinator.lastScrollSequence {
+            coordinator.lastScrollSequence = scroll.sequence
+            pool.scrollVisible(content, by: scroll.dy)
+        }
     }
 
     /// Lays out its single web view; `autoresizingMask` alone loses the size
@@ -146,25 +154,6 @@ struct WebView: NSViewRepresentable {
     class Coordinator {
         let pool = SlideWebViewPool()
         var visible: SlideContent?
-        private var observer: NSObjectProtocol?
-
-        func startListening() {
-            guard observer == nil else { return }
-            observer = NotificationCenter.default.addObserver(
-                forName: .remoteScroll, object: nil, queue: .main
-            ) { [weak self] notification in
-                MainActor.assumeIsolated {
-                    guard let self, let visible = self.visible,
-                          let dy = notification.userInfo?["dy"] as? Double else { return }
-                    self.pool.scrollVisible(visible, by: dy)
-                }
-            }
-        }
-
-        deinit {
-            if let observer {
-                NotificationCenter.default.removeObserver(observer)
-            }
-        }
+        var lastScrollSequence = 0
     }
 }

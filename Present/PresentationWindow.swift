@@ -12,7 +12,8 @@ struct PresentationView: View {
                 WebView(
                     content: slide.content,
                     neighbours: state.neighbourContents,
-                    pageZoom: state.zoomLevel
+                    pageZoom: state.zoomLevel,
+                    scroll: state.scrollRequest
                 )
                 .opacity(state.isBlackedOut ? 0 : 1)
             } else {

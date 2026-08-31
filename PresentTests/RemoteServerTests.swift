@@ -168,3 +168,50 @@ final class RemoteServerTests: XCTestCase {
         XCTAssertEqual(parsed?["total"] as? Int, 1)
     }
 }
+
+/// Scrolling used to travel by NotificationCenter, which put it out of reach of
+/// tests and, under Swift 6, across an actor boundary it could not cross.
+@MainActor
+final class RemoteScrollTests: XCTestCase {
+
+    private func makeState() -> PresentationState {
+        PresentationState(
+            storeURL: URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("\(UUID()).json"),
+            defaults: UserDefaults(suiteName: "scroll-\(UUID().uuidString)")!
+        )
+    }
+
+    func testScrollRequestReachesTheModel() {
+        let server = RemoteServer()
+        let state = makeState()
+        state.addSlide(Slide(url: "https://a.test"))
+        server.start(state: state)
+        defer { server.stop() }
+
+        let head = "GET /scroll?dy=-120&t=\(server.token) HTTP/1.1\r\nHost: 127.0.0.1:9123"
+        XCTAssertEqual(server.route(head).status, "200 OK")
+        XCTAssertEqual(state.scrollRequest.dy, -120)
+        XCTAssertEqual(state.scrollRequest.sequence, 1)
+    }
+
+    /// The same distance twice is two scrolls. Without the sequence number the
+    /// second one would look identical to the first and be ignored.
+    func testRepeatingTheSameDistanceCountsTwice() {
+        let state = makeState()
+        state.requestScroll(dy: -40)
+        let first = state.scrollRequest
+        state.requestScroll(dy: -40)
+        XCTAssertNotEqual(state.scrollRequest, first)
+        XCTAssertEqual(state.scrollRequest.sequence, 2)
+    }
+
+    func testAScrollWithoutADistanceIsIgnored() {
+        let server = RemoteServer()
+        let state = makeState()
+        server.start(state: state)
+        defer { server.stop() }
+
+        _ = server.route("GET /scroll?t=\(server.token) HTTP/1.1\r\nHost: 127.0.0.1:9123")
+        XCTAssertEqual(state.scrollRequest.sequence, 0)
+    }
+}
