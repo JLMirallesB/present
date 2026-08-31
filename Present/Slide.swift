@@ -54,7 +54,9 @@ class PresentationState {
     var presentationSets: [PresentationSet] = [] {
         didSet { saveToDisk() }
     }
-    var currentSetId: UUID?
+    var currentSetId: UUID? {
+        didSet { saveToDisk() }
+    }
     var currentIndex: Int = 0
     var isPresenting: Bool = false
     var zoomLevel: Double = 1.0
@@ -63,18 +65,36 @@ class PresentationState {
     func zoomOut() { zoomLevel = max(zoomLevel - 0.1, 0.3) }
     func zoomReset() { zoomLevel = 1.0 }
 
-    private static let autosaveKey = "presentAutosavedSets"
-    private static let currentSetKey = "presentCurrentSetId"
+    /// Everything that is persisted, written as a single atomic unit so the
+    /// selected list can never get out of sync with the lists themselves.
+    private struct StoredDocument: Codable {
+        var sets: [PresentationSet]
+        var currentSetId: UUID?
+    }
+
+    /// Suppresses autosave while `loadFromDisk()` populates the properties.
+    private var isLoading = false
+
+    private static let legacySetsKey = "presentAutosavedSets"
+    private static let legacyCurrentSetKey = "presentCurrentSetId"
+    private static let legacyURLsKey = "presentAutosavedURLs"
+
+    static var storeURL: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        return base
+            .appendingPathComponent("Present", isDirectory: true)
+            .appendingPathComponent("presentations.json")
+    }
 
     init() {
         loadFromDisk()
-        // Fallback: si no hay datos, crear un set por defecto
+        // Fallback: with no data at all, start with one empty list.
         if presentationSets.isEmpty {
             let defaultSet = PresentationSet(name: "Default")
             presentationSets.append(defaultSet)
             currentSetId = defaultSet.id
         }
-        // Asegurar que currentSetId es válido
+        // Make sure currentSetId still points at a list that exists.
         if currentSetId == nil || presentationSets.first(where: { $0.id == currentSetId }) == nil {
             currentSetId = presentationSets.first?.id
         }
@@ -112,7 +132,7 @@ class PresentationState {
     }
 
     func deleteSet(id: UUID) {
-        guard presentationSets.count > 1 else { return } // No eliminar el único set
+        guard presentationSets.count > 1 else { return } // Never delete the last list
         presentationSets.removeAll { $0.id == id }
         if currentSetId == id {
             currentSetId = presentationSets.first?.id
@@ -123,7 +143,6 @@ class PresentationState {
     func renameSet(id: UUID, newName: String) {
         if let index = presentationSets.firstIndex(where: { $0.id == id }) {
             presentationSets[index].name = newName
-            saveToDisk()
         }
     }
 
@@ -141,7 +160,8 @@ class PresentationState {
     }
 
     func removeSlide(at index: Int) {
-        if let setIndex = presentationSets.firstIndex(where: { $0.id == currentSetId }) {
+        if let setIndex = presentationSets.firstIndex(where: { $0.id == currentSetId }),
+           presentationSets[setIndex].slides.indices.contains(index) {
             presentationSets[setIndex].slides.remove(at: index)
         }
     }
@@ -152,44 +172,78 @@ class PresentationState {
         }
     }
 
+    /// `Slide` is a reference type, so editing one in place does not touch the
+    /// `presentationSets` array and never fires its `didSet`. Route edits
+    /// through here so callers cannot forget to persist them.
+    func updateSlide(_ slide: Slide, url: String, displayName: String?) {
+        slide.url = url
+        slide.displayName = displayName
+        saveToDisk()
+    }
+
     func saveToDisk() {
+        guard !isLoading else { return }
+        let document = StoredDocument(sets: presentationSets, currentSetId: currentSetId)
+        let url = Self.storeURL
         do {
-            let data = try JSONEncoder().encode(presentationSets)
-            UserDefaults.standard.set(data, forKey: Self.autosaveKey)
-            if let setId = currentSetId {
-                UserDefaults.standard.set(setId.uuidString, forKey: Self.currentSetKey)
-            }
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(), withIntermediateDirectories: true
+            )
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            try encoder.encode(document).write(to: url, options: .atomic)
         } catch {
-            print("Error saving presentation sets: \(error)")
+            print("Present: error saving presentations: \(error)")
         }
     }
 
-    func loadFromDisk() {
-        // Intentar cargar nuevo formato (PresentationSet)
-        if let data = UserDefaults.standard.data(forKey: Self.autosaveKey) {
+    private func loadFromDisk() {
+        isLoading = true
+        let migrated = loadStoredDocument()
+        isLoading = false
+        if migrated { saveToDisk() }
+    }
+
+    /// Populates the state from the newest store available.
+    /// Returns `true` when the data came from a legacy store and needs
+    /// rewriting in the current format.
+    private func loadStoredDocument() -> Bool {
+        if let data = try? Data(contentsOf: Self.storeURL) {
             do {
-                presentationSets = try JSONDecoder().decode([PresentationSet].self, from: data)
-                if let setIdString = UserDefaults.standard.string(forKey: Self.currentSetKey),
-                   let setId = UUID(uuidString: setIdString) {
-                    currentSetId = setId
-                }
-                return
+                let document = try JSONDecoder().decode(StoredDocument.self, from: data)
+                presentationSets = document.sets
+                currentSetId = document.currentSetId
+                return false
             } catch {
-                print("Error decoding presentation sets: \(error)")
+                print("Present: error decoding presentations.json: \(error)")
             }
         }
 
-        // Fallback: migrar desde formato antiguo (array de URLs)
-        if let urls = UserDefaults.standard.stringArray(forKey: "presentAutosavedURLs"), !urls.isEmpty {
-            let defaultSet = PresentationSet(
-                name: "Default",
-                slides: urls.map { Slide(url: $0) }
-            )
+        let defaults = UserDefaults.standard
+
+        // Legacy store 1: sets kept in UserDefaults.
+        if let data = defaults.data(forKey: Self.legacySetsKey) {
+            do {
+                presentationSets = try JSONDecoder().decode([PresentationSet].self, from: data)
+                if let idString = defaults.string(forKey: Self.legacyCurrentSetKey),
+                   let id = UUID(uuidString: idString) {
+                    currentSetId = id
+                }
+                return true
+            } catch {
+                print("Present: error decoding legacy presentation sets: \(error)")
+            }
+        }
+
+        // Legacy store 2: upstream's flat array of URLs.
+        if let urls = defaults.stringArray(forKey: Self.legacyURLsKey), !urls.isEmpty {
+            let defaultSet = PresentationSet(name: "Default", slides: urls.map { Slide(url: $0) })
             presentationSets = [defaultSet]
             currentSetId = defaultSet.id
-            saveToDisk() // Guardar en nuevo formato
-            UserDefaults.standard.removeObject(forKey: "presentAutosavedURLs")
+            return true
         }
+
+        return false
     }
 
     func loadFromFile(_ url: URL) -> Bool {
@@ -197,7 +251,7 @@ class PresentationState {
         let lines = contents.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
         guard !lines.isEmpty else { return false }
 
-        // Crear un nuevo set basado en el nombre del archivo
+        // Each opened file becomes a new list, named after the file.
         let fileName = url.deletingPathExtension().lastPathComponent
         var newSet = PresentationSet(name: fileName)
         newSet.slides = lines.map { Slide(url: $0) }

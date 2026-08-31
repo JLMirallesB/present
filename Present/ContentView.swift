@@ -183,9 +183,8 @@ struct ContentView: View {
     }
 
     private func saveSlideEdits(_ slide: Slide) {
-        slide.url = editingURL
-        slide.displayName = editingDisplayName.trimmingCharacters(in: .whitespaces).isEmpty ? nil : editingDisplayName
-        state.saveToDisk()
+        let name = editingDisplayName.trimmingCharacters(in: .whitespaces)
+        state.updateSlide(slide, url: editingURL, displayName: name.isEmpty ? nil : name)
         editingSlide = nil
     }
 
