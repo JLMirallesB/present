@@ -1,23 +1,78 @@
 import Foundation
 
+/// What a slide actually renders. Kept in the model rather than in `WebView`
+/// so the decision is testable without spinning up a view.
+enum SlideContent: Equatable {
+    /// A web page, at an absolute URL.
+    case web(String)
+    /// An image, shown letterboxed on black, at an absolute URL.
+    case image(String)
+    /// Markdown, rendered by the app itself.
+    case text(String)
+}
+
 @Observable
 class Slide: Identifiable, Codable {
     let id: UUID
     var url: String
     var displayName: String?
+    /// When non-nil, this is a text slide and `url` is ignored.
+    var text: String?
 
-    init(id: UUID = UUID(), url: String = "https://example.com", displayName: String? = nil) {
+    init(id: UUID = UUID(), url: String = "https://example.com", displayName: String? = nil, text: String? = nil) {
         self.id = id
         self.url = url
         self.displayName = displayName
+        self.text = text
     }
 
+    /// A text slide, ready to edit.
+    static func textSlide(_ text: String = "", displayName: String? = nil) -> Slide {
+        Slide(url: "", displayName: displayName, text: text)
+    }
+
+    var isTextSlide: Bool { text != nil }
+
+    var content: SlideContent {
+        if let text { return .text(text) }
+        if Self.looksLikeImage(url) { return .image(Self.absoluteURL(url)) }
+        return .web(Self.absoluteURL(url))
+    }
+
+    /// What the sidebar shows: the display name, else the first meaningful
+    /// line of a text slide, else the raw URL.
     var label: String {
-        displayName ?? url
+        if let displayName, !displayName.trimmingCharacters(in: .whitespaces).isEmpty {
+            return displayName
+        }
+        if let text {
+            let firstLine = text
+                .components(separatedBy: .newlines)
+                .first { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+            if let firstLine {
+                return firstLine.trimmingCharacters(in: CharacterSet(charactersIn: "# ").union(.whitespaces))
+            }
+            return "Empty text slide"
+        }
+        return url
+    }
+
+    private static let imageExtensions = ["png", "gif", "jpg", "jpeg", "webp", "svg"]
+
+    /// Extension check on the path only, so a query string does not hide it.
+    static func looksLikeImage(_ url: String) -> Bool {
+        let path = url.lowercased().split(separator: "?").first.map(String.init) ?? url.lowercased()
+        return imageExtensions.contains { path.hasSuffix(".\($0)") }
+    }
+
+    /// Bare hosts typed without a scheme are assumed to be https.
+    static func absoluteURL(_ raw: String) -> String {
+        if let parsed = URL(string: raw), parsed.scheme != nil { return raw }
+        return "https://\(raw)"
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, url, displayName
+        case id, url, displayName, text
     }
 
     required init(from decoder: Decoder) throws {
@@ -25,6 +80,7 @@ class Slide: Identifiable, Codable {
         id = try container.decode(UUID.self, forKey: .id)
         url = try container.decode(String.self, forKey: .url)
         displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+        text = try container.decodeIfPresent(String.self, forKey: .text)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -32,6 +88,7 @@ class Slide: Identifiable, Codable {
         try container.encode(id, forKey: .id)
         try container.encode(url, forKey: .url)
         try container.encodeIfPresent(displayName, forKey: .displayName)
+        try container.encodeIfPresent(text, forKey: .text)
     }
 }
 
@@ -79,14 +136,21 @@ class PresentationState {
     private static let legacyCurrentSetKey = "presentCurrentSetId"
     private static let legacyURLsKey = "presentAutosavedURLs"
 
-    static var storeURL: URL {
+    static var defaultStoreURL: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         return base
             .appendingPathComponent("Present", isDirectory: true)
             .appendingPathComponent("presentations.json")
     }
 
-    init() {
+    /// Where this instance persists. Injectable so tests get a temp directory
+    /// instead of the real Application Support folder.
+    let storeURL: URL
+    private let defaults: UserDefaults
+
+    init(storeURL: URL = PresentationState.defaultStoreURL, defaults: UserDefaults = .standard) {
+        self.storeURL = storeURL
+        self.defaults = defaults
         loadFromDisk()
         // Fallback: with no data at all, start with one empty list.
         if presentationSets.isEmpty {
@@ -166,25 +230,35 @@ class PresentationState {
         }
     }
 
+    /// Same semantics as SwiftUI's `move(fromOffsets:toOffset:)`, spelled out
+    /// here so the model stays pure Foundation and can be tested on its own.
     func moveSlide(from source: IndexSet, to destination: Int) {
-        if let setIndex = presentationSets.firstIndex(where: { $0.id == currentSetId }) {
-            presentationSets[setIndex].slides.move(fromOffsets: source, toOffset: destination)
-        }
+        guard let setIndex = presentationSets.firstIndex(where: { $0.id == currentSetId }) else { return }
+        var slides = presentationSets[setIndex].slides
+        guard source.allSatisfy({ slides.indices.contains($0) }),
+              (0...slides.count).contains(destination) else { return }
+
+        // Remove high index first so the lower ones stay valid.
+        let moved = source.sorted(by: >).map { slides.remove(at: $0) }.reversed()
+        let insertAt = destination - source.filter { $0 < destination }.count
+        slides.insert(contentsOf: moved, at: insertAt)
+        presentationSets[setIndex].slides = slides
     }
 
     /// `Slide` is a reference type, so editing one in place does not touch the
     /// `presentationSets` array and never fires its `didSet`. Route edits
     /// through here so callers cannot forget to persist them.
-    func updateSlide(_ slide: Slide, url: String, displayName: String?) {
+    func updateSlide(_ slide: Slide, url: String, displayName: String?, text: String? = nil) {
         slide.url = url
         slide.displayName = displayName
+        slide.text = text
         saveToDisk()
     }
 
     func saveToDisk() {
         guard !isLoading else { return }
         let document = StoredDocument(sets: presentationSets, currentSetId: currentSetId)
-        let url = Self.storeURL
+        let url = storeURL
         do {
             try FileManager.default.createDirectory(
                 at: url.deletingLastPathComponent(), withIntermediateDirectories: true
@@ -208,7 +282,7 @@ class PresentationState {
     /// Returns `true` when the data came from a legacy store and needs
     /// rewriting in the current format.
     private func loadStoredDocument() -> Bool {
-        if let data = try? Data(contentsOf: Self.storeURL) {
+        if let data = try? Data(contentsOf: storeURL) {
             do {
                 let document = try JSONDecoder().decode(StoredDocument.self, from: data)
                 presentationSets = document.sets
@@ -218,8 +292,6 @@ class PresentationState {
                 print("Present: error decoding presentations.json: \(error)")
             }
         }
-
-        let defaults = UserDefaults.standard
 
         // Legacy store 1: sets kept in UserDefaults.
         if let data = defaults.data(forKey: Self.legacySetsKey) {
@@ -246,15 +318,63 @@ class PresentationState {
         return false
     }
 
+    // MARK: - Plain text file format
+    //
+    // One slide per line. A line wrapped in double quotes is a text slide, with
+    // \n for line breaks — the convention used by kcarnold's fork, so files
+    // stay interchangeable. Everything else is a URL.
+
+    static func parseLine(_ line: String) -> Slide? {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return nil }
+        if trimmed.count >= 2, trimmed.hasPrefix("\""), trimmed.hasSuffix("\"") {
+            let body = String(trimmed.dropFirst().dropLast())
+            return Slide.textSlide(unescapeTextLine(body))
+        }
+        return Slide(url: trimmed)
+    }
+
+    static func formatLine(_ slide: Slide) -> String {
+        guard let text = slide.text else { return slide.url }
+        return "\"\(escapeTextLine(text))\""
+    }
+
+    private static func escapeTextLine(_ text: String) -> String {
+        text.replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacingOccurrences(of: "\n", with: "\\n")
+    }
+
+    private static func unescapeTextLine(_ raw: String) -> String {
+        var out = ""
+        var escaped = false
+        for character in raw {
+            if escaped {
+                switch character {
+                case "n": out.append("\n")
+                case "t": out.append("\t")
+                default: out.append(character)
+                }
+                escaped = false
+            } else if character == "\\" {
+                escaped = true
+            } else {
+                out.append(character)
+            }
+        }
+        if escaped { out.append("\\") }
+        return out
+    }
+
     func loadFromFile(_ url: URL) -> Bool {
         guard let contents = try? String(contentsOf: url, encoding: .utf8) else { return false }
-        let lines = contents.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-        guard !lines.isEmpty else { return false }
+        let slides = contents.components(separatedBy: .newlines).compactMap(Self.parseLine)
+        guard !slides.isEmpty else { return false }
 
         // Each opened file becomes a new list, named after the file.
         let fileName = url.deletingPathExtension().lastPathComponent
         var newSet = PresentationSet(name: fileName)
-        newSet.slides = lines.map { Slide(url: $0) }
+        newSet.slides = slides
 
         presentationSets.append(newSet)
         currentSetId = newSet.id
@@ -264,7 +384,7 @@ class PresentationState {
 
     func saveToFile(_ url: URL) -> Bool {
         guard let currentSet else { return false }
-        let contents = currentSet.slides.map { $0.url }.joined(separator: "\n") + "\n"
+        let contents = currentSet.slides.map(Self.formatLine).joined(separator: "\n") + "\n"
         do {
             try contents.write(to: url, atomically: true, encoding: .utf8)
             return true

@@ -14,6 +14,12 @@
 		A10000010000000000000005 /* Slide.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000005 /* Slide.swift */; };
 		A10000010000000000000006 /* RemoteServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000007 /* RemoteServer.swift */; };
 		A10000010000000000000007 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000008 /* Assets.xcassets */; };
+		A10000010000000000000008 /* MarkdownSlide.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000009 /* MarkdownSlide.swift */; };
+		B10000010000000000000001 /* PresentationStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000001 /* PresentationStateTests.swift */; };
+		B10000010000000000000002 /* SlideTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000002 /* SlideTests.swift */; };
+		B10000010000000000000003 /* MarkdownSlideTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000003 /* MarkdownSlideTests.swift */; };
+		B10000010000000000000004 /* Slide.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000005 /* Slide.swift */; };
+		B10000010000000000000005 /* MarkdownSlide.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000009 /* MarkdownSlide.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -25,11 +31,23 @@
 		A20000010000000000000006 /* Present.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Present.entitlements; sourceTree = "<group>"; };
 		A20000010000000000000007 /* RemoteServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteServer.swift; sourceTree = "<group>"; };
 		A20000010000000000000008 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A20000010000000000000009 /* MarkdownSlide.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownSlide.swift; sourceTree = "<group>"; };
 		A30000010000000000000001 /* Present.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Present.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B20000010000000000000001 /* PresentationStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentationStateTests.swift; sourceTree = "<group>"; };
+		B20000010000000000000002 /* SlideTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlideTests.swift; sourceTree = "<group>"; };
+		B20000010000000000000003 /* MarkdownSlideTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownSlideTests.swift; sourceTree = "<group>"; };
+		B30000010000000000000001 /* PresentTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PresentTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		A40000010000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B40000010000000000000002 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -54,6 +72,7 @@
 			isa = PBXGroup;
 			children = (
 				A50000010000000000000002 /* Present */,
+				B50000010000000000000001 /* PresentTests */,
 				A50000010000000000000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -66,6 +85,7 @@
 				A20000010000000000000003 /* WebView.swift */,
 				A20000010000000000000004 /* PresentationWindow.swift */,
 				A20000010000000000000005 /* Slide.swift */,
+				A20000010000000000000009 /* MarkdownSlide.swift */,
 				A20000010000000000000007 /* RemoteServer.swift */,
 				A20000010000000000000006 /* Present.entitlements */,
 				A20000010000000000000008 /* Assets.xcassets */,
@@ -73,10 +93,21 @@
 			path = Present;
 			sourceTree = "<group>";
 		};
+		B50000010000000000000001 /* PresentTests */ = {
+			isa = PBXGroup;
+			children = (
+				B20000010000000000000001 /* PresentationStateTests.swift */,
+				B20000010000000000000002 /* SlideTests.swift */,
+				B20000010000000000000003 /* MarkdownSlideTests.swift */,
+			);
+			path = PresentTests;
+			sourceTree = "<group>";
+		};
 		A50000010000000000000003 /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				A30000010000000000000001 /* Present.app */,
+				B30000010000000000000001 /* PresentTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -100,6 +131,22 @@
 			productName = Present;
 			productReference = A30000010000000000000001 /* Present.app */;
 			productType = "com.apple.product-type.application";
+		};
+		B60000010000000000000001 /* PresentTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B80000010000000000000001 /* Build configuration list for PBXNativeTarget "PresentTests" */;
+			buildPhases = (
+				B40000010000000000000001 /* Sources */,
+				B40000010000000000000002 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = PresentTests;
+			productName = PresentTests;
+			productReference = B30000010000000000000001 /* PresentTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -125,6 +172,7 @@
 			projectRoot = "";
 			targets = (
 				A60000010000000000000001 /* Present */,
+				B60000010000000000000001 /* PresentTests */,
 			);
 		};
 /* End PBXProject section */
@@ -139,7 +187,20 @@
 				A10000010000000000000003 /* WebView.swift in Sources */,
 				A10000010000000000000004 /* PresentationWindow.swift in Sources */,
 				A10000010000000000000005 /* Slide.swift in Sources */,
+				A10000010000000000000008 /* MarkdownSlide.swift in Sources */,
 				A10000010000000000000006 /* RemoteServer.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B40000010000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B10000010000000000000001 /* PresentationStateTests.swift in Sources */,
+				B10000010000000000000002 /* SlideTests.swift in Sources */,
+				B10000010000000000000003 /* MarkdownSlideTests.swift in Sources */,
+				B10000010000000000000004 /* Slide.swift in Sources */,
+				B10000010000000000000005 /* MarkdownSlide.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -249,6 +310,34 @@
 			};
 			name = Release;
 		};
+		BA0000010000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.present.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		BA0000010000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.present.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -266,6 +355,15 @@
 			buildConfigurations = (
 				AA0000010000000000000003 /* Debug */,
 				AA0000010000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B80000010000000000000001 /* Build configuration list for PBXNativeTarget "PresentTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BA0000010000000000000001 /* Debug */,
+				BA0000010000000000000002 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

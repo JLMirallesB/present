@@ -6,6 +6,8 @@ struct ContentView: View {
     @State private var editingSlide: Slide?
     @State private var editingDisplayName: String = ""
     @State private var editingURL: String = ""
+    @State private var editingText: String = ""
+    @State private var editingIsText: Bool = false
     @State private var showingSetMenu = false
     @State private var newSetName: String = ""
     @State private var showingNewSetAlert = false
@@ -79,6 +81,13 @@ struct ContentView: View {
                                 .frame(width: 24, alignment: .trailing)
                                 .draggable(slide.id.uuidString)
 
+                            if slide.isTextSlide {
+                                Image(systemName: "text.alignleft")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .help("Text slide")
+                            }
+
                             Text(slide.label)
                                 .lineLimit(1)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -112,13 +121,23 @@ struct ContentView: View {
                 }
 
                 HStack {
-                    Button(action: addSlide) {
+                    Menu {
+                        Button("URL Slide") { addSlide() }
+                        Button("Text Slide") { addTextSlide() }
+                    } label: {
                         Image(systemName: "plus")
+                    } primaryAction: {
+                        addSlide()
                     }
+                    .menuStyle(.button)
+                    .frame(width: 46)
+                    .help("Add a slide")
+
                     Button(action: deleteSelected) {
                         Image(systemName: "minus")
                     }
                     .disabled(selection == nil)
+                    .help("Remove the selected slide")
                     Spacer()
                 }
                 .padding(8)
@@ -126,7 +145,7 @@ struct ContentView: View {
             .navigationSplitViewColumnWidth(min: 150, ideal: 250, max: 500)
         } detail: {
             if let slide = state.currentSlide {
-                WebView(url: slide.url, pageZoom: state.zoomLevel)
+                WebView(content: slide.content, pageZoom: state.zoomLevel)
             } else {
                 VStack {
                     Text("No slide selected")
@@ -148,9 +167,10 @@ struct ContentView: View {
         }
         .sheet(item: $editingSlide) { slide in
             EditSlideSheet(
-                slide: slide,
                 displayName: $editingDisplayName,
                 url: $editingURL,
+                text: $editingText,
+                isText: $editingIsText,
                 onSave: { saveSlideEdits(slide) },
                 onCancel: { editingSlide = nil }
             )
@@ -180,16 +200,32 @@ struct ContentView: View {
         editingSlide = slide
         editingDisplayName = slide.displayName ?? ""
         editingURL = slide.url
+        editingText = slide.text ?? ""
+        editingIsText = slide.isTextSlide
     }
 
     private func saveSlideEdits(_ slide: Slide) {
         let name = editingDisplayName.trimmingCharacters(in: .whitespaces)
-        state.updateSlide(slide, url: editingURL, displayName: name.isEmpty ? nil : name)
+        state.updateSlide(
+            slide,
+            url: editingURL,
+            displayName: name.isEmpty ? nil : name,
+            text: editingIsText ? editingText : nil
+        )
         editingSlide = nil
     }
 
     private func addSlide() {
-        let slide = Slide()
+        append(Slide())
+    }
+
+    private func addTextSlide() {
+        let slide = Slide.textSlide("# New slide")
+        append(slide)
+        startEditing(slide)
+    }
+
+    private func append(_ slide: Slide) {
         state.addSlide(slide)
         selection = slide.id
         state.currentIndex = state.slides.count - 1
@@ -212,50 +248,76 @@ struct ContentView: View {
 }
 
 struct EditSlideSheet: View {
-    let slide: Slide
     @Binding var displayName: String
     @Binding var url: String
+    @Binding var text: String
+    @Binding var isText: Bool
     let onSave: () -> Void
     let onCancel: () -> Void
 
+    private var canSave: Bool {
+        let field = isText ? text : url
+        return !field.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     var body: some View {
-        VStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Edit Slide")
-                    .font(.headline)
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Edit Slide")
+                .font(.headline)
 
-                Group {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Display Name (optional)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        TextField("e.g., Introduction", text: $displayName)
-                            .textFieldStyle(.roundedBorder)
-                    }
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Display Name (optional)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                TextField("e.g., Introduction", text: $displayName)
+                    .textFieldStyle(.roundedBorder)
+            }
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("URL")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        TextField("https://example.com", text: $url)
-                            .textFieldStyle(.roundedBorder)
-                    }
+            Picker("", selection: $isText) {
+                Text("URL").tag(false)
+                Text("Text").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+
+            if isText {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Markdown")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    TextEditor(text: $text)
+                        .font(.system(.body, design: .monospaced))
+                        .frame(minHeight: 160)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 5)
+                                .stroke(Color(.separatorColor))
+                        )
+                    Text("# Heading  ·  **bold**  ·  *italic*  ·  - bullet  ·  `code`")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("URL")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    TextField("https://example.com", text: $url)
+                        .textFieldStyle(.roundedBorder)
                 }
             }
-            .padding()
 
-            HStack(spacing: 12) {
+            Spacer(minLength: 0)
+
+            HStack {
+                Spacer()
                 Button("Cancel", action: onCancel)
                     .keyboardShortcut(.cancelAction)
-
                 Button("Save", action: onSave)
                     .keyboardShortcut(.defaultAction)
-                    .disabled(url.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(!canSave)
             }
-            .padding()
-
-            Spacer()
         }
-        .frame(minWidth: 400, minHeight: 250)
+        .padding(20)
+        .frame(minWidth: 460, minHeight: isText ? 420 : 260)
     }
 }

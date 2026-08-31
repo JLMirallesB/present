@@ -30,6 +30,7 @@ A macOS SwiftUI app for giving presentations where each slide is a URL displayed
 - **Improved Navigation**: Use Cmd+↑/Cmd+↓ to navigate between slides in presentation mode without interfering with web page interactions
 - **Persistent Lists**: Automatically saves the last presentation list used, so it reopens where you left off
 - **Better Organization**: Easily switch between presentation lists with a dropdown selector in the sidebar
+- **Text Slides**: Slides written in Markdown and rendered by the app, for titles, section breaks or a closing slide — no URL needed
 
 ## Screenshots
 
@@ -45,6 +46,42 @@ A macOS SwiftUI app for giving presentations where each slide is a URL displayed
     </td>
   </tr>
 </table>
+
+## Text slides
+
+Not every slide needs a web page. Add one with **+ > Text Slide** and write
+Markdown directly:
+
+```markdown
+# El pulpo en el vaso
+
+- **Bold** and *italic*
+- `code`
+
+---
+
+*Jose Luis Miralles*
+```
+
+Supported: `#`/`##`/`###` headings, `**bold**`, `*italic*`/`_italic_`, `` `code` ``,
+`- ` bullets and `---` rules. Slide text is HTML-escaped, so `<`, `>` and `&`
+render as written. Cmd+= / Cmd+- resize text slides like any other slide.
+
+In the plain text file format a text slide is one quoted line with `\n` for
+breaks (`"# Title\n\nSubtitle"`), the same convention used by
+[kcarnold's fork](https://github.com/kcarnold/present), so files stay
+interchangeable.
+
+## Running the tests
+
+```bash
+./scripts/test.sh
+```
+
+43 tests covering the model: persistence and its migrations, navigation,
+reordering, the file format and the Markdown renderer. They run in about a
+tenth of a second, with no app launch, and run on every push via
+[GitHub Actions](.github/workflows/ci.yml).
 
 ## Ready-to-click app
 
@@ -119,10 +156,12 @@ https://github.com
 https://simonwillison.net
 ```
 
+Text slides are written as a quoted line, `"# Title\n\nSubtitle"`.
+
 > [!WARNING]
-> This format carries URLs only. **Display names are lost when you save to a
-> `.txt` file** and cannot be restored by opening it again. Your lists inside the
-> app keep their display names — they live in
+> This format carries URLs and text slides, but not display names. **Display
+> names are lost when you save to a `.txt` file.** Your lists inside the app
+> keep them — they live in
 > `~/Library/Containers/com.present.app/Data/Library/Application Support/Present/presentations.json`.
 
 ## Code walkthrough
