@@ -86,10 +86,10 @@ class PresentationWindowController {
             case 53: // Escape
                 self?.close(state: state)
                 return nil
-            case 24, 69 where cmd: // Cmd+= / Cmd+Numpad+
+            case 24 where cmd, 69 where cmd: // Cmd+= / Cmd+Numpad+
                 state.zoomIn()
                 return nil
-            case 27, 78 where cmd: // Cmd+- / Cmd+Numpad-
+            case 27 where cmd, 78 where cmd: // Cmd+- / Cmd+Numpad-
                 state.zoomOut()
                 return nil
             case 29 where cmd: // Cmd+0

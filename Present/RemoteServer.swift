@@ -45,11 +45,13 @@ final class RemoteServer {
                 return
             }
             let request = String(data: data, encoding: .utf8) ?? ""
-            let response = self.route(request)
-            let responseData = Data(response.utf8)
-            connection.send(content: responseData, completion: .contentProcessed { _ in
-                connection.cancel()
-            })
+            Task { @MainActor in
+                let response = self.route(request)
+                let responseData = Data(response.utf8)
+                connection.send(content: responseData, completion: .contentProcessed { _ in
+                    connection.cancel()
+                })
+            }
         }
     }
 
