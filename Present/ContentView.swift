@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct ContentView: View {
     @Bindable var state: PresentationState
@@ -15,6 +16,9 @@ struct ContentView: View {
     @State private var showingRenameSetAlert = false
     @State private var renameSetName: String = ""
     @State private var showingRemoteInfo = false
+    /// Which slide's copy button just fired, so it can show a tick and settle.
+    @State private var copiedSlide: UUID?
+    @State private var watcher = FileWatcher()
 
     var body: some View {
         NavigationSplitView {
@@ -93,6 +97,16 @@ struct ContentView: View {
                             Text(slide.label)
                                 .lineLimit(1)
                                 .frame(maxWidth: .infinity, alignment: .leading)
+
+                            Button(action: { copyLinks(from: slide) }) {
+                                Image(systemName: copiedSlide == slide.id ? "checkmark" : "link")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .help(slide.isTextSlide
+                                  ? "Copy this section: its heading and every link under it"
+                                  : "Copy this link, with its name")
 
                             Button(action: { startEditing(slide) }) {
                                 Image(systemName: "pencil")
@@ -177,6 +191,18 @@ struct ContentView: View {
             if let first = state.slides.first {
                 selection = first.id
             }
+            startWatching(state.currentFileURL)
+        }
+        .onDisappear { watcher.stop() }
+        .onChange(of: state.currentFileURL) { _, url in
+            startWatching(url)
+        }
+        .onChange(of: state.isPresenting) { _, presenting in
+            // A change we sat on rather than pull the slides out from under a
+            // talk in progress. The talk is over now.
+            if !presenting, state.fileHasChangedOnDisk, !state.hasUnsavedFileChanges {
+                reloadFromDisk()
+            }
         }
         .sheet(item: $editingSlide) { slide in
             EditSlideSheet(
@@ -210,10 +236,53 @@ struct ContentView: View {
     }
 
     /// The list name, plus the standard "Edited" marker once the list has
-    /// drifted from the file it came from.
+    /// drifted from the file it came from — and a second marker when the file
+    /// itself has moved on and we could not safely pick the change up.
     private var windowTitle: String {
         let name = state.currentSet?.name ?? "Present"
-        return state.hasUnsavedFileChanges ? "\(name) — Edited" : name
+        var marks: [String] = []
+        if state.hasUnsavedFileChanges { marks.append("Edited") }
+        if state.fileHasChangedOnDisk { marks.append("changed on disk") }
+        return marks.isEmpty ? name : "\(name) — \(marks.joined(separator: ", "))"
+    }
+
+    private func startWatching(_ url: URL?) {
+        guard let url else {
+            watcher.stop()
+            return
+        }
+        watcher.watch(url) { fileChangedOnDisk() }
+    }
+
+    /// The file moved underneath us. Reload when there is nothing to lose by
+    /// it; otherwise leave the list alone and say so in the title.
+    private func fileChangedOnDisk() {
+        // Our own Save fires the watcher too, and leaves nothing to pick up.
+        guard state.fileIsStale else { return }
+        guard !state.isPresenting, !state.hasUnsavedFileChanges else {
+            state.noteFileChangedOnDisk()
+            return
+        }
+        reloadFromDisk()
+    }
+
+    /// Reloading builds fresh slides, so the old selection points at nothing.
+    private func reloadFromDisk() {
+        guard state.reloadFromFile() else { return }
+        selection = state.currentSlide?.id
+    }
+
+    private func copyLinks(from slide: Slide) {
+        let text = state.linksToCopy(from: slide)
+        guard !text.isEmpty else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+
+        copiedSlide = slide.id
+        Task {
+            try? await Task.sleep(for: .seconds(1.2))
+            if copiedSlide == slide.id { copiedSlide = nil }
+        }
     }
 
     private func startEditing(_ slide: Slide) {

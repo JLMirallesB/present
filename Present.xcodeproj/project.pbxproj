@@ -17,6 +17,7 @@
 		A10000010000000000000008 /* MarkdownSlide.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000009 /* MarkdownSlide.swift */; };
 		A10000010000000000000009 /* RemoteControlView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000001000000000000000A /* RemoteControlView.swift */; };
 		A1000001000000000000000A /* PresentationKeymap.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000001000000000000000B /* PresentationKeymap.swift */; };
+		A1000001000000000000000B /* FileWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000001000000000000000C /* FileWatcher.swift */; };
 		B10000010000000000000008 /* PresentationKeymap.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000001000000000000000B /* PresentationKeymap.swift */; };
 		B10000010000000000000009 /* PresentationKeymapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000005 /* PresentationKeymapTests.swift */; };
 		B10000010000000000000001 /* PresentationStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000001 /* PresentationStateTests.swift */; };
@@ -40,6 +41,7 @@
 		A20000010000000000000009 /* MarkdownSlide.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownSlide.swift; sourceTree = "<group>"; };
 		A2000001000000000000000A /* RemoteControlView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteControlView.swift; sourceTree = "<group>"; };
 		A2000001000000000000000B /* PresentationKeymap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentationKeymap.swift; sourceTree = "<group>"; };
+		A2000001000000000000000C /* FileWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileWatcher.swift; sourceTree = "<group>"; };
 		B20000010000000000000005 /* PresentationKeymapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentationKeymapTests.swift; sourceTree = "<group>"; };
 		A30000010000000000000001 /* Present.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Present.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B20000010000000000000001 /* PresentationStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentationStateTests.swift; sourceTree = "<group>"; };
@@ -99,6 +101,7 @@
 				A20000010000000000000007 /* RemoteServer.swift */,
 				A2000001000000000000000A /* RemoteControlView.swift */,
 				A2000001000000000000000B /* PresentationKeymap.swift */,
+				A2000001000000000000000C /* FileWatcher.swift */,
 				A20000010000000000000006 /* Present.entitlements */,
 				A20000010000000000000008 /* Assets.xcassets */,
 			);
@@ -205,6 +208,7 @@
 				A10000010000000000000009 /* RemoteControlView.swift in Sources */,
 				A1000001000000000000000A /* PresentationKeymap.swift in Sources */,
 				A10000010000000000000006 /* RemoteServer.swift in Sources */,
+				A1000001000000000000000B /* FileWatcher.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

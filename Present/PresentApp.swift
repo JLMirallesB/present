@@ -121,6 +121,7 @@ enum FileDialogHelper {
             saveAs(state: state)
             return
         }
+        guard !state.fileIsStale || shouldOverwriteChangedFile(state: state, url: url) else { return }
         if !state.saveToFile(url) {
             presentError("Could not save \(url.lastPathComponent)",
                          detail: "The file could not be written. Try Save As.")
@@ -138,6 +139,31 @@ enum FileDialogHelper {
         if !state.saveToFile(url) {
             presentError("Could not save \(url.lastPathComponent)",
                          detail: "The file could not be written.")
+        }
+    }
+
+    /// Somebody else has written to the file since we last read it. Saving now
+    /// would throw their work away without a word, so ask first. The watcher
+    /// handles this in the ordinary case; this is the backstop for when it did
+    /// not — the list had unsaved edits, or the change landed mid-presentation.
+    @MainActor
+    private static func shouldOverwriteChangedFile(state: PresentationState, url: URL) -> Bool {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "\(url.lastPathComponent) has changed on disk"
+        alert.informativeText = "Something else has written to this file since you opened it. "
+            + "Saving replaces what is there now; reloading discards the changes you have made here."
+        alert.addButton(withTitle: "Save Anyway")
+        alert.addButton(withTitle: "Reload")
+        alert.addButton(withTitle: "Cancel")
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            return true
+        case .alertSecondButtonReturn:
+            state.reloadFromFile()
+            return false
+        default:
+            return false
         }
     }
 

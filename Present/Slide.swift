@@ -144,6 +144,44 @@ class PresentationState {
     /// Whether the current list has changed since it was last written to that
     /// file. Meaningless without one, so it stays false until there is one.
     private(set) var hasUnsavedFileChanges = false
+    /// What the file looked like when we last read it or wrote it. Anything
+    /// else on disk now means somebody else has been editing it.
+    private var fileStamp: FileStamp?
+    /// Set when the file changed under a list we could not safely reload:
+    /// one with unsaved edits, or one that is on screen mid-presentation.
+    private(set) var fileHasChangedOnDisk = false
+
+    /// Size as well as date, because two writes inside the same clock tick can
+    /// share a modification date and a change in length gives them away.
+    struct FileStamp: Equatable {
+        var modified: Date
+        var size: Int
+
+        /// `FileManager` rather than `URL.resourceValues`, which is allowed to
+        /// hand back a cached answer — exactly what we must not have here.
+        init?(of url: URL) {
+            guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+                  let modified = attributes[.modificationDate] as? Date,
+                  let size = attributes[.size] as? Int
+            else { return nil }
+            self.modified = modified
+            self.size = size
+        }
+    }
+
+    /// Whether the file has been written by somebody else since we last read
+    /// or wrote it. Touches the disk, so ask when something happens — not from
+    /// a view body, which would stat the file on every redraw.
+    var fileIsStale: Bool {
+        guard let currentFileURL, let fileStamp else { return false }
+        guard let current = FileStamp(of: currentFileURL) else { return false }
+        return current != fileStamp
+    }
+
+    /// Records that the file moved underneath us and we left the list alone.
+    func noteFileChangedOnDisk() {
+        fileHasChangedOnDisk = true
+    }
 
     func requestScroll(dy: Double) {
         scrollRequest = ScrollRequest(sequence: scrollRequest.sequence + 1, dy: dy)
@@ -266,7 +304,9 @@ class PresentationState {
     /// The file belongs to the list it was opened as, not to the app.
     private func detachFromFile() {
         currentFileURL = nil
+        fileStamp = nil
         hasUnsavedFileChanges = false
+        fileHasChangedOnDisk = false
     }
 
     func addSlide(_ slide: Slide) {
@@ -489,8 +529,9 @@ class PresentationState {
         return out
     }
 
-    func loadFromFile(_ url: URL) -> Bool {
-        guard let data = try? Data(contentsOf: url) else { return false }
+    /// A file read into a list of its own, or nil if it holds no slides.
+    private func parsedSet(from url: URL) -> PresentationSet? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
         let fallbackName = url.deletingPathExtension().lastPathComponent
 
         var newSet: PresentationSet
@@ -502,18 +543,48 @@ class PresentationState {
             let name = file.name.trimmingCharacters(in: .whitespaces)
             newSet = PresentationSet(name: name.isEmpty ? fallbackName : name, slides: slides)
         } else {
-            guard let contents = String(data: data, encoding: .utf8) else { return false }
+            guard let contents = String(data: data, encoding: .utf8) else { return nil }
             let slides = contents.components(separatedBy: .newlines).compactMap(Self.parseLine)
             newSet = PresentationSet(name: fallbackName, slides: slides)
         }
-        guard !newSet.slides.isEmpty else { return false }
+        return newSet.slides.isEmpty ? nil : newSet
+    }
 
+    func loadFromFile(_ url: URL) -> Bool {
+        guard let newSet = parsedSet(from: url) else { return false }
         presentationSets.append(newSet)
         currentSetId = newSet.id
         currentIndex = 0
-        currentFileURL = url
-        hasUnsavedFileChanges = false
+        attachToFile(url)
         return true
+    }
+
+    /// Re-reads the file the current list came from, replacing that list where
+    /// it stands. Deliberately not `loadFromFile`, which appends: picking up an
+    /// edit made elsewhere must not leave you with two copies of the same list,
+    /// nor move you off the one you were looking at.
+    @discardableResult
+    func reloadFromFile() -> Bool {
+        guard let url = currentFileURL,
+              let index = presentationSets.firstIndex(where: { $0.id == currentSetId }),
+              let parsed = parsedSet(from: url)
+        else { return false }
+        presentationSets[index].name = parsed.name
+        presentationSets[index].slides = parsed.slides
+        // The list may have got shorter while we were looking away.
+        currentIndex = min(currentIndex, parsed.slides.count - 1)
+        attachToFile(url)
+        return true
+    }
+
+    /// The list is now exactly what the file holds, and we know what the file
+    /// looked like at that moment. Called last: assigning the slides above
+    /// runs the autosave, which would otherwise mark the list as edited.
+    private func attachToFile(_ url: URL) {
+        currentFileURL = url
+        fileStamp = FileStamp(of: url)
+        hasUnsavedFileChanges = false
+        fileHasChangedOnDisk = false
     }
 
     @discardableResult
@@ -530,12 +601,40 @@ class PresentationState {
                 let contents = currentSet.slides.map(Self.formatLine).joined(separator: "\n") + "\n"
                 try contents.write(to: url, atomically: true, encoding: .utf8)
             }
-            currentFileURL = url
-            hasUnsavedFileChanges = false
+            attachToFile(url)
             return true
         } catch {
             print("Present: error writing \(url.lastPathComponent): \(error)")
             return false
         }
+    }
+
+    // MARK: - Copying links
+    //
+    // These lists are mostly made to be handed on — pasted into a course
+    // handout, a mail, a note. Reading a URL off a slide by eye and typing it
+    // out again is the one thing the app should never make you do.
+
+    /// One slide as its name and then its address, on two lines. An unnamed
+    /// slide is just the address: repeating it as its own title helps nobody.
+    static func linkBlock(for slide: Slide) -> String {
+        let name = (slide.displayName ?? "").trimmingCharacters(in: .whitespaces)
+        let url = slide.url.trimmingCharacters(in: .whitespaces)
+        if url.isEmpty { return "" }
+        return name.isEmpty ? url : "\(name)\n\(url)"
+    }
+
+    /// What the copy button puts on the pasteboard. From a URL slide, that one
+    /// link. From a text slide, the whole section it heads: its own markdown,
+    /// then every link below it down to the next text slide — which is how
+    /// these lists get built, a heading followed by the pages it introduces.
+    func linksToCopy(from slide: Slide) -> String {
+        guard slide.isTextSlide else { return Self.linkBlock(for: slide) }
+        guard let start = slides.firstIndex(where: { $0.id == slide.id }) else { return "" }
+        let section = slides[slides.index(after: start)...].prefix { !$0.isTextSlide }
+        return ([slide.text ?? ""] + section.map(Self.linkBlock))
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n\n")
     }
 }

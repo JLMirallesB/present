@@ -398,4 +398,178 @@ final class FileFormatTests: XCTestCase {
         state.addSlide(Slide(url: "https://a.test"))
         XCTAssertFalse(state.hasUnsavedFileChanges, "no file to be dirty against")
     }
+
+    // MARK: Changes made outside the app
+
+    /// Writes `contents` over the file the way another editor would.
+    private func writeFromOutside(_ contents: String, to file: URL) throws {
+        try contents.write(to: file, atomically: true, encoding: .utf8)
+    }
+
+    private func openedFile(_ state: PresentationState, named name: String = "x.json") -> URL {
+        let file = directory.appendingPathComponent(name)
+        state.addSlide(Slide(url: "https://a.test", displayName: "A"))
+        state.saveToFile(file)
+        return file
+    }
+
+    func testAFileNobodyTouchedIsNotStale() {
+        let state = makeState()
+        _ = openedFile(state)
+        XCTAssertFalse(state.fileIsStale)
+    }
+
+    /// The whole point: Cmd+S must be able to tell that it is about to bury
+    /// somebody else's work.
+    func testAnOutsideWriteMakesTheFileStale() throws {
+        let state = makeState()
+        let file = openedFile(state)
+        try writeFromOutside("Otra | https://b.test\nY otra | https://c.test\n", to: file)
+        XCTAssertTrue(state.fileIsStale)
+    }
+
+    /// Saving fires the file watcher too. If our own write looked like an
+    /// outside one, every save would raise a false alarm.
+    func testOurOwnSaveDoesNotLookLikeAnOutsideWrite() {
+        let state = makeState()
+        let file = openedFile(state)
+        state.addSlide(Slide(url: "https://b.test"))
+        state.saveToFile(file)
+        XCTAssertFalse(state.fileIsStale)
+    }
+
+    func testAListWithNoFileIsNeverStale() {
+        let state = makeState()
+        state.addSlide(Slide(url: "https://a.test"))
+        XCTAssertFalse(state.fileIsStale)
+    }
+
+    /// Reload must not behave like Open, which appends: one list edited
+    /// elsewhere has to come back as that same list, not as a second copy.
+    func testReloadReplacesTheListInPlace() throws {
+        let state = makeState()
+        let file = openedFile(state)
+        let setCount = state.presentationSets.count
+        let setId = state.currentSetId
+
+        try writeFromOutside("B | https://b.test\nC | https://c.test\n", to: file)
+        XCTAssertTrue(state.reloadFromFile())
+
+        XCTAssertEqual(state.presentationSets.count, setCount)
+        XCTAssertEqual(state.currentSetId, setId)
+        XCTAssertEqual(state.slides.map(\.url), ["https://b.test", "https://c.test"])
+    }
+
+    func testReloadClearsBothMarkers() throws {
+        let state = makeState()
+        let file = openedFile(state)
+        state.addSlide(Slide(url: "https://mine.test"))
+        state.noteFileChangedOnDisk()
+        XCTAssertTrue(state.hasUnsavedFileChanges)
+
+        try writeFromOutside("B | https://b.test\n", to: file)
+        XCTAssertTrue(state.reloadFromFile())
+
+        XCTAssertFalse(state.hasUnsavedFileChanges)
+        XCTAssertFalse(state.fileHasChangedOnDisk)
+        XCTAssertFalse(state.fileIsStale)
+    }
+
+    /// The list can come back shorter than it went away.
+    func testReloadPullsTheIndexBackIntoTheList() throws {
+        let state = makeState()
+        let file = directory.appendingPathComponent("x.json")
+        state.addSlide(Slide(url: "https://a.test"))
+        state.addSlide(Slide(url: "https://b.test"))
+        state.addSlide(Slide(url: "https://c.test"))
+        state.saveToFile(file)
+        state.currentIndex = 2
+
+        try writeFromOutside("https://only.test\n", to: file)
+        XCTAssertTrue(state.reloadFromFile())
+
+        XCTAssertEqual(state.currentIndex, 0)
+        XCTAssertNotNil(state.currentSlide)
+    }
+
+    func testReloadWithoutAFileDoesNothing() {
+        let state = makeState()
+        state.addSlide(Slide(url: "https://a.test"))
+        XCTAssertFalse(state.reloadFromFile())
+    }
+
+    /// Rubbish on disk must leave the list standing rather than empty it.
+    func testReloadKeepsTheListWhenTheFileTurnsToRubbish() throws {
+        let state = makeState()
+        let file = openedFile(state)
+        try writeFromOutside("\n\n", to: file)
+
+        XCTAssertFalse(state.reloadFromFile())
+        XCTAssertEqual(state.slides.count, 1)
+    }
+
+    // MARK: Copying links
+
+    func testCopyingAURLSlideGivesItsNameThenItsAddress() {
+        let state = makeState()
+        let slide = Slide(url: "https://a.test", displayName: "Portada")
+        state.addSlide(slide)
+        XCTAssertEqual(state.linksToCopy(from: slide), "Portada\nhttps://a.test")
+    }
+
+    /// An unnamed slide's label falls back to its URL. Copying it as both a
+    /// title and an address would just print it twice.
+    func testAnUnnamedSlideIsJustItsAddress() {
+        let state = makeState()
+        let slide = Slide(url: "https://a.test")
+        state.addSlide(slide)
+        XCTAssertEqual(state.linksToCopy(from: slide), "https://a.test")
+    }
+
+    func testCopyingATextSlideGathersTheSectionUnderIt() {
+        let state = makeState()
+        let heading = Slide.textSlide("# ORGANISMOS")
+        state.addSlide(heading)
+        state.addSlide(Slide(url: "https://a.test", displayName: "A"))
+        state.addSlide(Slide(url: "https://b.test", displayName: "B"))
+
+        XCTAssertEqual(state.linksToCopy(from: heading), """
+            # ORGANISMOS
+
+            A
+            https://a.test
+
+            B
+            https://b.test
+            """)
+    }
+
+    /// The next heading is where one section ends and the next begins.
+    func testASectionStopsAtTheNextTextSlide() {
+        let state = makeState()
+        let heading = Slide.textSlide("# UNO")
+        state.addSlide(heading)
+        state.addSlide(Slide(url: "https://a.test", displayName: "A"))
+        state.addSlide(Slide.textSlide("# DOS"))
+        state.addSlide(Slide(url: "https://b.test", displayName: "B"))
+
+        let copied = state.linksToCopy(from: heading)
+        XCTAssertTrue(copied.contains("https://a.test"))
+        XCTAssertFalse(copied.contains("https://b.test"))
+        XCTAssertFalse(copied.contains("# DOS"))
+    }
+
+    func testATextSlideWithNothingUnderItIsJustItsHeading() {
+        let state = makeState()
+        let heading = Slide.textSlide("# SOLO")
+        state.addSlide(heading)
+        XCTAssertEqual(state.linksToCopy(from: heading), "# SOLO")
+    }
+
+    /// A slide the list does not hold has no section to gather.
+    func testCopyingATextSlideThatIsNotInTheListGivesNothing() {
+        let state = makeState()
+        state.addSlide(Slide(url: "https://a.test"))
+        XCTAssertEqual(state.linksToCopy(from: Slide.textSlide("# HUÉRFANA")), "")
+    }
 }
