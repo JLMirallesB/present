@@ -36,6 +36,8 @@ A macOS SwiftUI app for giving presentations where each slide is a URL displayed
 - **Multiple Displays**: Pick which screen to present on
 - **Secured Remote**: The phone remote now needs a key, shown as a QR code in the app
 - **Text Slides**: Slides written in Markdown and rendered by the app, for titles, section breaks or a closing slide — no URL needed
+- **Watched File**: The list reloads on its own when the file is edited elsewhere, and Save refuses to bury a change it did not make
+- **Copy Links**: A button per row copies a slide's name and address, or a whole section's worth of them from its heading slide
 
 ## Screenshots
 
@@ -83,9 +85,10 @@ interchangeable.
 ./scripts/test.sh
 ```
 
-91 tests covering the model: persistence and its migrations, navigation,
-reordering, the file formats, the Markdown renderer, the presentation keymap
-and the remote server's access checks. They run in about a
+106 tests covering the model: persistence and its migrations, navigation,
+reordering, the file formats and reloading a file edited elsewhere, copying a
+slide's links, the Markdown renderer, the presentation keymap and the remote
+server's access checks. They run in about a
 tenth of a second, with no app launch, and run on every push via
 [GitHub Actions](.github/workflows/ci.yml).
 
