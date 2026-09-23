@@ -20,6 +20,8 @@
 		A1000001000000000000000B /* FileWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000001000000000000000C /* FileWatcher.swift */; };
 		B10000010000000000000008 /* PresentationKeymap.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000001000000000000000B /* PresentationKeymap.swift */; };
 		B10000010000000000000009 /* PresentationKeymapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000005 /* PresentationKeymapTests.swift */; };
+		B1000001000000000000000A /* WebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000003 /* WebView.swift */; };
+		B1000001000000000000000B /* SlideWebViewPoolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000006 /* SlideWebViewPoolTests.swift */; };
 		B10000010000000000000001 /* PresentationStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000001 /* PresentationStateTests.swift */; };
 		B10000010000000000000002 /* SlideTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000002 /* SlideTests.swift */; };
 		B10000010000000000000003 /* MarkdownSlideTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000003 /* MarkdownSlideTests.swift */; };
@@ -43,6 +45,7 @@
 		A2000001000000000000000B /* PresentationKeymap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentationKeymap.swift; sourceTree = "<group>"; };
 		A2000001000000000000000C /* FileWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileWatcher.swift; sourceTree = "<group>"; };
 		B20000010000000000000005 /* PresentationKeymapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentationKeymapTests.swift; sourceTree = "<group>"; };
+		B20000010000000000000006 /* SlideWebViewPoolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlideWebViewPoolTests.swift; sourceTree = "<group>"; };
 		A30000010000000000000001 /* Present.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Present.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B20000010000000000000001 /* PresentationStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentationStateTests.swift; sourceTree = "<group>"; };
 		B20000010000000000000002 /* SlideTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlideTests.swift; sourceTree = "<group>"; };
@@ -116,6 +119,7 @@
 				B20000010000000000000003 /* MarkdownSlideTests.swift */,
 				B20000010000000000000004 /* RemoteServerTests.swift */,
 				B20000010000000000000005 /* PresentationKeymapTests.swift */,
+				B20000010000000000000006 /* SlideWebViewPoolTests.swift */,
 			);
 			path = PresentTests;
 			sourceTree = "<group>";
@@ -225,6 +229,8 @@
 				B10000010000000000000007 /* RemoteServerTests.swift in Sources */,
 				B10000010000000000000008 /* PresentationKeymap.swift in Sources */,
 				B10000010000000000000009 /* PresentationKeymapTests.swift in Sources */,
+				B1000001000000000000000A /* WebView.swift in Sources */,
+				B1000001000000000000000B /* SlideWebViewPoolTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

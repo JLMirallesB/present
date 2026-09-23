@@ -16,14 +16,26 @@ final class SlideWebViewPool {
     /// Most recently used last, so eviction can drop from the front.
     private var order: [SlideContent] = []
 
+    /// A web view set up the way every slide wants it.
+    private static func makeWebView() -> WKWebView {
+        let configuration = WKWebViewConfiguration()
+        // Off by default in WKWebView: without it `requestFullscreen()` is
+        // refused, so the fullscreen button on an embedded video — an X post,
+        // a YouTube embed — does nothing at all.
+        configuration.preferences.isElementFullscreenEnabled = true
+
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.allowsBackForwardNavigationGestures = false
+        // Slides sit on black; without this the gap before first paint is white.
+        webView.underPageBackgroundColor = .black
+        return webView
+    }
+
     func view(for content: SlideContent) -> WKWebView {
         touch(content)
         if let existing = cache[content] { return existing }
 
-        let webView = WKWebView()
-        webView.allowsBackForwardNavigationGestures = false
-        // Slides sit on black; without this the gap before first paint is white.
-        webView.underPageBackgroundColor = .black
+        let webView = Self.makeWebView()
         load(content, into: webView)
         cache[content] = webView
         return webView
@@ -32,10 +44,8 @@ final class SlideWebViewPool {
     /// Loads pages we are about to need, off-screen.
     func preload(_ contents: [SlideContent]) {
         for content in contents where cache[content] == nil {
-            let webView = WKWebView()
-            webView.allowsBackForwardNavigationGestures = false
-            webView.underPageBackgroundColor = .black
-                // Give it a real size, or layout-sensitive pages render wrong when
+            let webView = Self.makeWebView()
+            // Give it a real size, or layout-sensitive pages render wrong when
             // they finally appear.
             webView.frame = CGRect(x: 0, y: 0, width: 1280, height: 800)
             load(content, into: webView)
